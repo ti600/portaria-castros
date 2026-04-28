@@ -627,7 +627,6 @@ export default function Porteiro() {
                     <input
                       type="file"
                       accept="image/*"
-                      capture="environment"
                       onChange={alterarFoto}
                       className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2 text-sm text-[#4a2636] file:mr-3 file:rounded-md file:border-0 file:bg-[#97003f] file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
                     />
