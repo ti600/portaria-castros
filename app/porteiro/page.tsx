@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 're
 import { useRouter } from 'next/navigation'
 import { BrandMark } from '../components/BrandMark'
 import { ImageLightbox } from '../components/ImageLightbox'
+import { lerUsuarioLogado, limparSessaoUsuario } from '../lib/auth'
 import { registrarLog } from '../lib/logs'
 import { otimizarFoto } from '../lib/photo'
 import { supabase } from '../lib/supabase'
@@ -73,18 +74,6 @@ function limparNome(valor: string) {
 
 function limparNumero(valor: string) {
   return valor.replace(/\D/g, '')
-}
-
-function lerUsuarioLogado(): Usuario | null {
-  const salvo = localStorage.getItem('usuario')
-  if (!salvo) return null
-
-  try {
-    return JSON.parse(salvo) as Usuario
-  } catch {
-    localStorage.removeItem('usuario')
-    return null
-  }
 }
 
 function traduzirErroUpload(message: string) {
@@ -437,7 +426,7 @@ export default function Porteiro() {
   }
 
   function handleLogout() {
-    localStorage.removeItem('usuario')
+    limparSessaoUsuario()
     router.push('/')
   }
 
@@ -453,38 +442,45 @@ export default function Porteiro() {
 
   return (
     <main className="min-h-screen bg-[#fbf7f8] text-[#2b1420]">
-      <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-        <header className="mb-6 flex flex-col gap-4 border-b border-[#eadde3] pb-5 lg:flex-row lg:items-center lg:justify-between">
-          <BrandMark compact label="Portaria" title="Controle de Entrada" />
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-md border border-[#eadde3] bg-white px-3 py-2 text-sm text-[#6f4358]">
-              {usuario?.nome || 'Operador'}
+      <div className="mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8">
+        <header className="mb-6 rounded-xl border border-[#eadde3] bg-white px-4 py-4 shadow-sm sm:px-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="flex flex-col gap-3">
+              <BrandMark compact label="Portaria" title="Controle de Entrada" />
+              <p className="max-w-2xl text-sm text-[#6f4358]">
+                Fluxo operacional para registro, consulta rapida e saida de visitantes.
+              </p>
             </div>
-            {usuario?.perfil === 'admin' && (
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="rounded-md border border-[#eadde3] bg-[#fffafb] px-3 py-2 text-sm font-medium text-[#6f4358]">
+                {usuario?.nome || 'Operador'}
+              </div>
+              {usuario?.perfil === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => router.push('/admin')}
+                  className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                >
+                  Painel admin
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => router.push('/admin')}
-                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                onClick={atualizarLista}
+                disabled={carregando}
+                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
               >
-                Painel admin
+                Atualizar
               </button>
-            )}
-            <button
-              type="button"
-              onClick={atualizarLista}
-              disabled={carregando}
-              className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
-            >
-              Atualizar
-            </button>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-md bg-[#5f0029] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#4d0021]"
-            >
-              Sair
-            </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-md bg-[#5f0029] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#4d0021]"
+              >
+                Sair
+              </button>
+            </div>
           </div>
         </header>
 
@@ -495,29 +491,32 @@ export default function Porteiro() {
         )}
 
         <section className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-[#eadde3] bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm">
             <p className="text-sm font-semibold text-[#8a2d55]">Dentro agora</p>
-            <p className="mt-2 text-3xl font-black text-[#97003f]">{dentro.length}</p>
+            <p className="mt-3 text-3xl font-black text-[#97003f]">{dentro.length}</p>
           </div>
-          <div className="rounded-lg border border-[#eadde3] bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm">
             <p className="text-sm font-semibold text-[#8a2d55]">Ultima entrada</p>
-            <p className="mt-2 text-xl font-black text-[#97003f]">{ultimaEntrada}</p>
+            <p className="mt-3 text-xl font-black text-[#97003f]">{ultimaEntrada}</p>
           </div>
-          <div className="rounded-lg border border-[#eadde3] bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm">
             <p className="text-sm font-semibold text-[#8a2d55]">Turno</p>
-            <p className="mt-2 text-xl font-black text-[#97003f]">
+            <p className="mt-3 text-xl font-black text-[#97003f]">
               {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date())}
             </p>
           </div>
         </section>
 
-        <section className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_0.92fr]">
+        <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
           <form
             onSubmit={registrarEntrada}
-            className="rounded-lg border border-[#eadde3] bg-white p-4 shadow-sm sm:p-5"
+            className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm sm:p-5"
           >
             <div className="mb-5">
               <h2 className="text-lg font-bold">Registrar entrada</h2>
+              <p className="mt-1 text-sm text-[#6f4358]">
+                Preencha os dados essenciais e registre a entrada com agilidade.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -600,7 +599,7 @@ export default function Porteiro() {
                 <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
                   Foto do visitante
                 </span>
-                <div className="grid gap-3 rounded-md border border-dashed border-[#d7b8c7] bg-[#fffafb] p-3 sm:grid-cols-[160px_1fr] sm:items-center">
+                <div className="grid gap-3 rounded-lg border border-dashed border-[#d7b8c7] bg-[#fffafb] p-3 sm:grid-cols-[160px_1fr] sm:items-center">
                   <button
                     type="button"
                     onClick={() =>
@@ -635,23 +634,25 @@ export default function Porteiro() {
                     <p className="text-sm text-[#8a2d55]">
                       A imagem sera reduzida antes do envio para economizar espaco.
                     </p>
-                    <button
-                      type="button"
-                      onClick={abrirCamera}
-                      disabled={carregandoCamera}
-                      className="w-fit rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
-                    >
-                      {carregandoCamera ? 'Abrindo camera...' : 'Usar camera do computador'}
-                    </button>
-                    {foto && (
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={limparFoto}
-                        className="w-fit rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                        onClick={abrirCamera}
+                        disabled={carregandoCamera}
+                        className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
                       >
-                        Remover foto
+                        {carregandoCamera ? 'Abrindo camera...' : 'Usar camera do computador'}
                       </button>
-                    )}
+                      {foto && (
+                        <button
+                          type="button"
+                          onClick={limparFoto}
+                          className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                        >
+                          Remover foto
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -670,10 +671,15 @@ export default function Porteiro() {
             </button>
           </form>
 
-          <div className="rounded-lg border border-[#eadde3] bg-white shadow-sm">
+          <div className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
             <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <h2 className="text-lg font-bold">Pessoas dentro</h2>
+                <div>
+                  <h2 className="text-lg font-bold">Pessoas dentro</h2>
+                  <p className="mt-1 text-sm text-[#6f4358]">
+                    Visualizacao rapida dos visitantes ainda ativos na portaria.
+                  </p>
+                </div>
                 <input
                   value={buscaDentro}
                   onChange={(event) => setBuscaDentro(event.target.value)}
@@ -722,7 +728,14 @@ export default function Porteiro() {
                   </button>
 
                   <div className="min-w-0">
-                    <p className="break-words font-bold">{registro.nome}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="break-words font-bold">{registro.nome}</p>
+                      {registro.documento && (
+                        <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55]">
+                          {registro.documento}
+                        </span>
+                      )}
+                    </div>
                     <p className="mt-1 break-words text-sm text-[#6f4358]">
                       {texto(registro.empresa)} · {texto(registro.servico)} · {texto(registro.destino)}
                     </p>

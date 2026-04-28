@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BrandMark } from './components/BrandMark'
+import { salvarSessaoUsuario } from './lib/auth'
 import { supabase } from './lib/supabase'
 
 type Perfil = 'admin' | 'porteiro'
@@ -46,7 +47,7 @@ export default function Login() {
       return
     }
 
-    localStorage.setItem('usuario', JSON.stringify(data))
+    salvarSessaoUsuario(data)
     router.push(data.perfil === 'admin' ? '/admin' : '/porteiro')
   }
 

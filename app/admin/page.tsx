@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BrandMark } from '../components/BrandMark'
 import { ImageLightbox } from '../components/ImageLightbox'
+import { lerUsuarioLogado, limparSessaoUsuario } from '../lib/auth'
 import { listarLogs, LogSistema, registrarLog } from '../lib/logs'
 import { exportarRelatorioExcel, exportarRelatorioPdf } from '../lib/reports'
 import { supabase } from '../lib/supabase'
@@ -62,18 +63,6 @@ function texto(valor?: string | null) {
 
 function limparNome(valor: string) {
   return valor.replace(/[^\p{L}\s'-]/gu, '').replace(/\s{2,}/g, ' ')
-}
-
-function lerUsuarioLogado(): Usuario | null {
-  const salvo = localStorage.getItem('usuario')
-  if (!salvo) return null
-
-  try {
-    return JSON.parse(salvo) as Usuario
-  } catch {
-    localStorage.removeItem('usuario')
-    return null
-  }
 }
 
 export default function Admin() {
@@ -336,7 +325,7 @@ export default function Admin() {
   }
 
   function handleLogout() {
-    localStorage.removeItem('usuario')
+    limparSessaoUsuario()
     router.push('/')
   }
 
@@ -358,36 +347,43 @@ export default function Admin() {
 
   return (
     <main className="min-h-screen bg-[#fbf7f8] text-[#2b1420]">
-      <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-        <header className="mb-6 flex flex-col gap-4 border-b border-[#eadde3] pb-5 lg:flex-row lg:items-center lg:justify-between">
-          <BrandMark compact label="Administracao" title="Painel da Portaria" />
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-md border border-[#eadde3] bg-white px-3 py-2 text-sm text-[#6f4358]">
-              {admin?.nome || 'Administrador'}
+      <div className="mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8">
+        <header className="mb-6 rounded-xl border border-[#eadde3] bg-white px-4 py-4 shadow-sm sm:px-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="flex flex-col gap-3">
+              <BrandMark compact label="Administracao" title="Painel da Portaria" />
+              <p className="max-w-2xl text-sm text-[#6f4358]">
+                Operacao administrativa, relatorios, usuarios e auditoria em um unico painel.
+              </p>
             </div>
-            <button
-              type="button"
-              onClick={() => router.push('/porteiro')}
-              className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-            >
-              Abrir portaria
-            </button>
-            <button
-              type="button"
-              onClick={atualizarDados}
-              disabled={carregando}
-              className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
-            >
-              Atualizar
-            </button>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-md bg-[#5f0029] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#4d0021]"
-            >
-              Sair
-            </button>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="rounded-md border border-[#eadde3] bg-[#fffafb] px-3 py-2 text-sm font-medium text-[#6f4358]">
+                {admin?.nome || 'Administrador'}
+              </div>
+              <button
+                type="button"
+                onClick={atualizarDados}
+                disabled={carregando}
+                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
+              >
+                Atualizar
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/porteiro')}
+                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+              >
+                Abrir portaria
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-md bg-[#5f0029] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#4d0021]"
+              >
+                Sair
+              </button>
+            </div>
           </div>
         </header>
 
@@ -401,15 +397,22 @@ export default function Admin() {
           {estatisticas.map((item) => (
             <div
               key={item.rotulo}
-              className="rounded-lg border border-[#eadde3] bg-white p-4 shadow-sm"
-            >
-              <p className="text-sm font-semibold text-[#8a2d55]">{item.rotulo}</p>
-              <p className="mt-2 text-3xl font-black text-[#97003f]">{item.valor}</p>
+            className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm"
+          >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[#8a2d55]">{item.rotulo}</p>
+                  <p className="mt-3 text-3xl font-black text-[#97003f]">{item.valor}</p>
+                </div>
+                <div className="rounded-full bg-[#fff0f6] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a2d55]">
+                  Painel
+                </div>
+              </div>
             </div>
           ))}
         </section>
 
-        <div className="mb-5 inline-flex rounded-lg border border-[#e5d4dc] bg-white p-1 shadow-sm">
+        <div className="mb-5 inline-flex rounded-xl border border-[#e5d4dc] bg-white p-1 shadow-sm">
           <button
             type="button"
             onClick={() => setAba('registros')}
@@ -446,13 +449,18 @@ export default function Admin() {
         </div>
 
         {aba === 'registros' && (
-          <section className="rounded-lg border border-[#eadde3] bg-white shadow-sm">
+          <section className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
             <form
               onSubmit={aplicarFiltrosRegistros}
               className="flex flex-col gap-4 border-b border-[#f0e3e8] px-4 py-4 sm:px-5"
             >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <h2 className="text-lg font-bold">Registros de entrada</h2>
+                <div>
+                  <h2 className="text-lg font-bold">Registros de entrada</h2>
+                  <p className="mt-1 text-sm text-[#6f4358]">
+                    Consulte por periodo e exporte apenas o recorte necessario.
+                  </p>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -471,7 +479,7 @@ export default function Admin() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[180px_180px_minmax(220px,1fr)_auto]">
+              <div className="grid grid-cols-1 gap-3 rounded-lg bg-[#fffafb] p-3 lg:grid-cols-[180px_180px_minmax(220px,1fr)_auto]">
                 <label className="block">
                   <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Data inicial</span>
                   <input
