@@ -127,8 +127,8 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="pt-6 text-xs tracking-[0.08em] text-[#f3c7da]/80">
-            Desenvolvido pela equipe de T.I. do Castro&apos;s Park Hotel
+          <div className="pt-6 text-xs tracking-[0.04em] text-[#f3c7da]/80">
+            © 2026 Desenvolvido pela equipe de T.I. do Castro&apos;s Park Hotel
           </div>
         </section>
       </div>
