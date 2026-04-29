@@ -1,6 +1,6 @@
 'use client'
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BrandMark } from '../components/BrandMark'
 import { ImageLightbox } from '../components/ImageLightbox'
@@ -300,6 +300,7 @@ export default function Porteiro() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const eventoListaInputRef = useRef<HTMLInputElement | null>(null)
+  const ultimoCpfConsultadoRef = useRef('')
   const acoesEntradaRef = useRef<HTMLDivElement | null>(null)
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [dentro, setDentro] = useState<Registro[]>([])
@@ -336,6 +337,7 @@ export default function Porteiro() {
   const [registrandoSaida, setRegistrandoSaida] = useState<string | null>(null)
   const [registrandoReentrada, setRegistrandoReentrada] = useState<string | null>(null)
   const [erro, setErro] = useState('')
+  const [avisoAutopreenchimento, setAvisoAutopreenchimento] = useState('')
   const router = useRouter()
 
   async function carregarDentro() {
@@ -395,7 +397,7 @@ export default function Porteiro() {
 
   useEffect(() => {
     return () => {
-      if (fotoPreview) {
+      if (fotoPreview.startsWith('blob:')) {
         URL.revokeObjectURL(fotoPreview)
       }
 
@@ -554,11 +556,15 @@ export default function Porteiro() {
           ? limparNumero(valor)
           : valor
 
+    if (campo === 'documento') {
+      setAvisoAutopreenchimento('')
+    }
+
     setForm((atual) => ({ ...atual, [campo]: proximoValor }))
   }
 
   function limparFoto() {
-    if (fotoPreview) {
+    if (fotoPreview.startsWith('blob:')) {
       URL.revokeObjectURL(fotoPreview)
     }
 
@@ -566,7 +572,7 @@ export default function Porteiro() {
     setFotoPreview('')
   }
 
-  function limparListaEvento() {
+  const limparListaEvento = useCallback(() => {
     if (eventoListaFotoPreview.startsWith('blob:')) {
       URL.revokeObjectURL(eventoListaFotoPreview)
     }
@@ -575,9 +581,9 @@ export default function Porteiro() {
     setEventoListaFotoPreview('')
     setEventoListaFotoNome('')
     setEventoListaFotoTipo('')
-  }
+  }, [eventoListaFotoPreview])
 
-  function resetarEvento(fecharModal = true) {
+  const resetarEvento = useCallback((fecharModal = true) => {
     setEventoForm({
       ...formularioEventoInicial,
       materiais: [criarMaterialEvento()],
@@ -586,7 +592,68 @@ export default function Porteiro() {
     if (fecharModal) {
       setEventoModalAberto(false)
     }
-  }
+  }, [limparListaEvento])
+
+  const aplicarHistoricoPorCpf = useCallback((registro: Registro, cpf: string) => {
+    if (fotoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(fotoPreview)
+    }
+
+    setFoto(null)
+    setFotoPreview(registro.foto_url || '')
+    setForm({
+      nome: registro.nome || '',
+      documento: cpf,
+      telefone: registro.telefone || '',
+      empresa: registro.empresa || '',
+      servico: '',
+      destino: '',
+      responsavel: '',
+      entradaEvento: '',
+      eventoNome: '',
+      itensEntrada: '',
+    })
+    resetarEvento()
+    setAvisoAutopreenchimento('Dados encontrados pelo CPF e preenchidos automaticamente, incluindo a foto do ultimo registro.')
+  }, [fotoPreview, resetarEvento])
+
+  const buscarHistoricoPorCpf = useCallback(async (cpf: string) => {
+    const { data, error } = await supabase
+      .from('registros')
+      .select('nome, documento, telefone, empresa, servico, destino, responsavel, foto_url, hora_entrada')
+      .eq('documento', cpf)
+      .order('hora_entrada', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      setErro('Nao foi possivel consultar o historico pelo CPF.')
+      return
+    }
+
+    if (!data) {
+      setAvisoAutopreenchimento('')
+      return
+    }
+
+    aplicarHistoricoPorCpf(data as Registro, cpf)
+  }, [aplicarHistoricoPorCpf])
+
+  useEffect(() => {
+    const cpf = form.documento.trim()
+
+    if (cpf.length !== 11) {
+      ultimoCpfConsultadoRef.current = cpf
+      return
+    }
+
+    if (ultimoCpfConsultadoRef.current === cpf) {
+      return
+    }
+
+    ultimoCpfConsultadoRef.current = cpf
+    void buscarHistoricoPorCpf(cpf)
+  }, [buscarHistoricoPorCpf, form.documento])
 
   function fecharCamera() {
     streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -912,6 +979,8 @@ export default function Porteiro() {
         foto ? enviarFoto(foto) : Promise.resolve(null),
         form.entradaEvento === 'sim' && eventoListaFoto ? enviarAnexoEvento(eventoListaFoto) : Promise.resolve(null),
       ])
+      const fotoHistoricoUrl = !foto && fotoPreview && !fotoPreview.startsWith('blob:') ? fotoPreview : null
+      const fotoRegistroUrl = fotoUrl || fotoHistoricoUrl
 
       const materiaisEvento = eventoForm.materiais.filter(
         (material) =>
@@ -957,7 +1026,7 @@ export default function Porteiro() {
         evento_materiais: form.entradaEvento === 'sim' ? materiaisEvento : null,
         itens_entrada: itensEventoResumo,
         hora_entrada: new Date().toISOString(),
-        ...(fotoUrl ? { foto_url: fotoUrl } : {}),
+        ...(fotoRegistroUrl ? { foto_url: fotoRegistroUrl } : {}),
       }
 
       const { error } = await supabase.from('registros').insert(novoRegistro)
@@ -974,6 +1043,8 @@ export default function Porteiro() {
       })
 
       setForm(formularioInicial)
+      setAvisoAutopreenchimento('')
+      ultimoCpfConsultadoRef.current = ''
       resetarEvento()
       limparFoto()
       setConfirmacaoEntradaAberta(false)
@@ -1290,6 +1361,12 @@ export default function Porteiro() {
                 />
               </label>
 
+              {avisoAutopreenchimento ? (
+                <div className="md:col-span-2 rounded-md border border-[#d8d1b1] bg-[#fff8da] px-3 py-2 text-sm text-[#7a5b00]">
+                  {avisoAutopreenchimento}
+                </div>
+              ) : null}
+
               <label className="block">
                 <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Telefone *</span>
                 <input
@@ -1510,6 +1587,8 @@ export default function Porteiro() {
                   type="button"
                   onClick={() => {
                     setForm(formularioInicial)
+                    setAvisoAutopreenchimento('')
+                    ultimoCpfConsultadoRef.current = ''
                     limparFoto()
                     setErro('')
                   }}
