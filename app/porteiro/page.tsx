@@ -236,6 +236,33 @@ async function enviarFoto(foto: File) {
   return data.publicUrl
 }
 
+async function enviarAnexoEvento(arquivo: File) {
+  if (arquivo.type === 'application/pdf') {
+    const extensao = arquivo.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'pdf'
+    const caminho = `entradas/${Date.now()}-${crypto.randomUUID()}.${extensao}`
+
+    const { error } = await supabase.storage.from(BUCKET_FOTOS).upload(caminho, arquivo, {
+      cacheControl: '3600',
+      contentType: 'application/pdf',
+      upsert: false,
+    })
+
+    if (error) {
+      console.error('Erro Supabase Storage:', error)
+      throw new Error(traduzirErroUpload(error.message))
+    }
+
+    const { data } = supabase.storage.from(BUCKET_FOTOS).getPublicUrl(caminho)
+    return data.publicUrl
+  }
+
+  return await enviarFoto(arquivo)
+}
+
+function ehPdfArquivo(valor?: string | null) {
+  return (valor || '').toLowerCase().includes('.pdf')
+}
+
 async function lerArquivoComoDataUrl(arquivo: File) {
   return await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
@@ -282,6 +309,8 @@ export default function Porteiro() {
   const [fotoPreview, setFotoPreview] = useState('')
   const [eventoListaFoto, setEventoListaFoto] = useState<File | null>(null)
   const [eventoListaFotoPreview, setEventoListaFotoPreview] = useState('')
+  const [eventoListaFotoNome, setEventoListaFotoNome] = useState('')
+  const [eventoListaFotoTipo, setEventoListaFotoTipo] = useState('')
   const [imagemAberta, setImagemAberta] = useState<{ alt: string; src: string } | null>(null)
   const [buscaDentro, setBuscaDentro] = useState('')
   const [buscaHospedesDentro, setBuscaHospedesDentro] = useState('')
@@ -538,8 +567,14 @@ export default function Porteiro() {
   }
 
   function limparListaEvento() {
+    if (eventoListaFotoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(eventoListaFotoPreview)
+    }
+
     setEventoListaFoto(null)
     setEventoListaFotoPreview('')
+    setEventoListaFotoNome('')
+    setEventoListaFotoTipo('')
   }
 
   function resetarEvento(fecharModal = true) {
@@ -596,21 +631,27 @@ export default function Porteiro() {
       return
     }
 
-    if (!arquivo.type.startsWith('image/')) {
+    if (!arquivo.type.startsWith('image/') && arquivo.type !== 'application/pdf') {
       limparListaEvento()
-      setErro('Selecione uma imagem valida para a lista de materiais.')
+      setErro('Selecione uma imagem ou PDF valido para a lista de materiais.')
       return
     }
 
     if (arquivo.size > TAMANHO_MAXIMO_FOTO) {
       limparListaEvento()
-      setErro('A foto da lista deve ter no maximo 5 MB.')
+      setErro('O anexo da lista deve ter no maximo 5 MB.')
       return
     }
 
     setEventoListaFoto(arquivo)
+    setEventoListaFotoNome(arquivo.name)
+    setEventoListaFotoTipo(arquivo.type)
     try {
-      setEventoListaFotoPreview(await lerArquivoComoDataUrl(arquivo))
+      if (arquivo.type === 'application/pdf') {
+        setEventoListaFotoPreview(URL.createObjectURL(arquivo))
+      } else {
+        setEventoListaFotoPreview(await lerArquivoComoDataUrl(arquivo))
+      }
     } catch (error) {
       limparListaEvento()
       setErro(
@@ -869,7 +910,7 @@ export default function Porteiro() {
     try {
       const [fotoUrl, listaEventoUrl] = await Promise.all([
         foto ? enviarFoto(foto) : Promise.resolve(null),
-        form.entradaEvento === 'sim' && eventoListaFoto ? enviarFoto(eventoListaFoto) : Promise.resolve(null),
+        form.entradaEvento === 'sim' && eventoListaFoto ? enviarAnexoEvento(eventoListaFoto) : Promise.resolve(null),
       ])
 
       const materiaisEvento = eventoForm.materiais.filter(
@@ -1576,14 +1617,16 @@ export default function Porteiro() {
                           <button
                             type="button"
                             onClick={() =>
-                              setImagemAberta({
-                                alt: `Lista de materiais de ${registro.nome}`,
-                                src: registro.evento_lista_foto_url || '',
-                              })
+                              ehPdfArquivo(registro.evento_lista_foto_url)
+                                ? window.open(registro.evento_lista_foto_url || '', '_blank', 'noopener,noreferrer')
+                                : setImagemAberta({
+                                    alt: `Lista de materiais de ${registro.nome}`,
+                                    src: registro.evento_lista_foto_url || '',
+                                  })
                             }
                             className="mt-2 rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
                           >
-                            Ver lista anexada
+                            {ehPdfArquivo(registro.evento_lista_foto_url) ? 'Abrir PDF anexado' : 'Ver lista anexada'}
                           </button>
                         )}
                       </div>
@@ -1791,14 +1834,16 @@ export default function Porteiro() {
                             <button
                               type="button"
                               onClick={() =>
-                                setImagemAberta({
-                                  alt: `Lista de materiais de ${registro.nome}`,
-                                  src: registro.evento_lista_foto_url || '',
-                                })
+                                ehPdfArquivo(registro.evento_lista_foto_url)
+                                  ? window.open(registro.evento_lista_foto_url || '', '_blank', 'noopener,noreferrer')
+                                  : setImagemAberta({
+                                      alt: `Lista de materiais de ${registro.nome}`,
+                                      src: registro.evento_lista_foto_url || '',
+                                    })
                               }
                               className="mt-2 rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
                             >
-                              Ver lista anexada
+                              {ehPdfArquivo(registro.evento_lista_foto_url) ? 'Abrir PDF anexado' : 'Ver lista anexada'}
                             </button>
                           )}
                         </div>
@@ -2035,9 +2080,23 @@ export default function Porteiro() {
                         <td className="px-4 py-3 text-[#6f4358]">{texto(registro.destino)}</td>
                         <td className="px-4 py-3 text-[#6f4358]">
                           {registro.entrada_evento ? (
-                            <div className="space-y-1">
+                            <div className="group relative space-y-1">
                               <p className="font-semibold text-[#4a2636]">{texto(registro.evento_nome)}</p>
                               <p className="text-xs leading-5">{resumirTexto(registro.itens_entrada, 20)}</p>
+                              <div className="pointer-events-none absolute left-0 top-full z-20 mt-2 hidden w-[320px] max-w-[42vw] rounded-lg border border-[#e7c8d6] bg-white p-3 text-left shadow-lg group-hover:block">
+                                <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
+                                  Evento
+                                </p>
+                                <p className="mt-1 text-sm font-semibold text-[#2b1420]">
+                                  {texto(registro.evento_nome)}
+                                </p>
+                                <p className="mt-3 text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
+                                  Itens
+                                </p>
+                                <p className="mt-1 whitespace-pre-line text-sm leading-6 text-[#6f4358]">
+                                  {texto(registro.itens_entrada).replace(/\s\|\s/g, '\n')}
+                                </p>
+                              </div>
                             </div>
                           ) : (
                             '-'
@@ -2045,23 +2104,35 @@ export default function Porteiro() {
                         </td>
                         <td className="px-4 py-3">
                           {registro.evento_lista_foto_url ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setImagemAberta({
-                                  alt: `Anexo do evento de ${registro.nome}`,
-                                  src: registro.evento_lista_foto_url || '',
-                                })
-                              }
-                              className="size-12 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={registro.evento_lista_foto_url}
-                                alt={`Anexo do evento de ${registro.nome}`}
-                                className="h-full w-full object-cover"
-                              />
-                            </button>
+                            ehPdfArquivo(registro.evento_lista_foto_url) ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  window.open(registro.evento_lista_foto_url || '', '_blank', 'noopener,noreferrer')
+                                }
+                                className="rounded-md border border-[#eadde3] bg-[#fffafb] px-3 py-2 text-xs font-bold text-[#97003f]"
+                              >
+                                PDF
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setImagemAberta({
+                                    alt: `Anexo do evento de ${registro.nome}`,
+                                    src: registro.evento_lista_foto_url || '',
+                                  })
+                                }
+                                className="size-12 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={registro.evento_lista_foto_url}
+                                  alt={`Anexo do evento de ${registro.nome}`}
+                                  className="h-full w-full object-cover"
+                                />
+                              </button>
+                            )
                           ) : (
                             <span className="text-[#6f4358]">-</span>
                           )}
@@ -2105,7 +2176,7 @@ export default function Porteiro() {
 
             <div className="max-h-[calc(92vh-84px)] overflow-y-auto px-5 py-5">
               <div className="rounded-lg border border-[#eadde3] bg-[#fffafb] p-4 text-sm text-[#6f4358]">
-                Se a empresa ja trouxe a folha preenchida, basta anexar a foto da lista. Sem a foto, o preenchimento digital da ficha passa a ser obrigatorio.
+                Se a empresa ja trouxe a folha preenchida, basta anexar a foto da lista. Sem a foto, o preenchimento da entrada de materiais passa a ser obrigatorio.
               </div>
 
               <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.45fr)_340px]">
@@ -2258,25 +2329,34 @@ export default function Porteiro() {
                     Se a empresa ja chegar com a folha pronta, anexe a imagem aqui e voce nao precisa digitar os materiais.
                   </p>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      eventoListaFotoPreview
-                        ? setImagemAberta({
-                            alt: 'Lista de materiais anexada',
-                            src: eventoListaFotoPreview,
-                          })
-                        : undefined
+                    <button
+                      type="button"
+                      onClick={() =>
+                        eventoListaFotoPreview
+                          ? eventoListaFotoTipo === 'application/pdf'
+                            ? window.open(eventoListaFotoPreview, '_blank', 'noopener,noreferrer')
+                            : setImagemAberta({
+                                alt: 'Lista de materiais anexada',
+                                src: eventoListaFotoPreview,
+                              })
+                          : undefined
                     }
                     className="mt-4 grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-md border border-[#eadde3] bg-white"
                   >
                     {eventoListaFotoPreview ? (
+                      eventoListaFotoTipo === 'application/pdf' ? (
+                        <div className="px-4 text-center">
+                          <p className="text-sm font-bold text-[#97003f]">PDF anexado</p>
+                          <p className="mt-2 text-xs text-[#6f4358] break-words">{eventoListaFotoNome || 'arquivo.pdf'}</p>
+                        </div>
+                      ) : (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={eventoListaFotoPreview}
                         alt="Previa da lista do evento"
                         className="h-full w-full object-cover"
                       />
+                      )
                     ) : (
                       <span className="px-4 text-center text-sm font-semibold text-[#8a2d55]">
                         Nenhuma lista anexada
@@ -2291,7 +2371,7 @@ export default function Porteiro() {
                         onClick={() => eventoListaInputRef.current?.click()}
                         className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
                       >
-                        Anexar imagem
+                        Anexar arquivo
                       </button>
                       <button
                         type="button"
@@ -2305,12 +2385,12 @@ export default function Porteiro() {
                     <input
                       ref={eventoListaInputRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/*,application/pdf"
                       onChange={alterarListaEvento}
                       className="hidden"
                     />
                     <p className="text-xs text-[#8a2d55]">
-                      Escolha se vai anexar a foto da folha ou capturar direto pela webcam. A imagem tambem sera reduzida antes do envio.
+                      Escolha se vai anexar a foto da folha, um PDF ou capturar direto pela webcam. Imagens tambem serao reduzidas antes do envio.
                     </p>
                     {eventoListaFotoPreview && (
                       <button

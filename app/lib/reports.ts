@@ -155,6 +155,10 @@ function formatarItensParaPdf(valor?: string | null) {
     .join('\n')
 }
 
+function ehPdfUrl(url?: string | null) {
+  return (url || '').toLowerCase().includes('.pdf')
+}
+
 export function exportarRelatorioExcel(registros: RegistroRelatorio[]) {
   const linhas = registros.map((registro) => ({
     Nome: limparTexto(registro.nome),
@@ -330,7 +334,12 @@ export async function exportarRelatorioPdf(registros: RegistroRelatorio[]) {
 
       const anexoEvento = await obterImagem(fotoCache, registro.evento_lista_foto_url)
 
-      if (anexoEvento) {
+      if (ehPdfUrl(registro.evento_lista_foto_url)) {
+        doc.setTextColor(111, 67, 88)
+        doc.setFont('helvetica', 'normal')
+        doc.text('Este registro possui um anexo em PDF associado.', 24, 126)
+        doc.text('Abra o PDF diretamente no sistema para consultar o documento completo.', 24, 136)
+      } else if (anexoEvento) {
         doc.addImage(anexoEvento, 'JPEG', 24, 94, 162, 152)
       } else {
         doc.setTextColor(111, 67, 88)
