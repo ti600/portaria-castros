@@ -23,6 +23,8 @@ type Usuario = {
 type Registro = {
   id: string
   nome: string
+  operador_entrada_email?: string | null
+  operador_entrada_nome?: string | null
   documento?: string | null
   telefone?: string | null
   empresa?: string | null
@@ -30,7 +32,12 @@ type Registro = {
   destino?: string | null
   responsavel?: string | null
   entrada_evento?: boolean | null
+  evento_fone?: string | null
+  evento_lista_foto_url?: string | null
   evento_nome?: string | null
+  evento_os_numero?: string | null
+  evento_recebimento_em?: string | null
+  evento_responsavel?: string | null
   itens_entrada?: string | null
   foto_url?: string | null
   hora_entrada?: string | null
@@ -66,6 +73,28 @@ function texto(valor?: string | null) {
 
 function limparNome(valor: string) {
   return valor.replace(/[^\p{L}\s'-]/gu, '').replace(/\s{2,}/g, ' ')
+}
+
+function limparNumero(valor: string) {
+  return valor.replace(/\D/g, '')
+}
+
+function formatarCpf(valor?: string | null) {
+  const numeros = limparNumero(valor || '').slice(0, 11)
+
+  return numeros
+    .replace(/^(\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1-$2')
+}
+
+function formatarTelefone(valor?: string | null) {
+  const numeros = limparNumero(valor || '').slice(0, 11)
+
+  if (numeros.length <= 2) return numeros
+  if (numeros.length <= 7) return `(${numeros.slice(0, 2)}) ${numeros.slice(2)}`
+
+  return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7)}`
 }
 
 export default function Admin() {
@@ -505,7 +534,7 @@ export default function Admin() {
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-                    Pesquisar nome ou documento
+                    Pesquisar nome ou CPF
                   </span>
                   <input
                     value={pesquisaRegistro}
@@ -525,16 +554,20 @@ export default function Admin() {
             </form>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1080px] text-left text-sm">
+              <table className="w-full min-w-[1520px] text-left text-sm">
                 <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
                   <tr>
                     <th className="px-4 py-3">Foto</th>
                     <th className="px-4 py-3">Nome</th>
-                    <th className="px-4 py-3">Documento</th>
+                    <th className="px-4 py-3">CPF</th>
+                    <th className="px-4 py-3">Telefone</th>
                     <th className="px-4 py-3">Empresa</th>
                     <th className="px-4 py-3">Servico</th>
                     <th className="px-4 py-3">Destino</th>
+                    <th className="px-4 py-3">Responsavel</th>
+                    <th className="px-4 py-3">Operador da entrada</th>
                     <th className="px-4 py-3">Evento / Itens</th>
+                    <th className="px-4 py-3">Anexo</th>
                     <th className="px-4 py-3">Entrada</th>
                     <th className="px-4 py-3">Saida</th>
                   </tr>
@@ -542,7 +575,7 @@ export default function Admin() {
                 <tbody className="divide-y divide-[#f3e8ed]">
                   {!registros.length && !dataInicio && !dataFim && !pesquisaRegistro.trim() && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-[#8a2d55]">
+                      <td colSpan={13} className="px-4 py-8 text-center text-[#8a2d55]">
                         Preencha uma data ou pesquisa para carregar os registros.
                       </td>
                     </tr>
@@ -577,10 +610,18 @@ export default function Admin() {
                         </button>
                       </td>
                       <td className="px-4 py-3 font-semibold">{texto(registro.nome)}</td>
-                      <td className="px-4 py-3 text-[#6f4358]">{texto(registro.documento)}</td>
+                      <td className="px-4 py-3 text-[#6f4358]">{formatarCpf(registro.documento) || '-'}</td>
+                      <td className="px-4 py-3 text-[#6f4358]">{formatarTelefone(registro.telefone) || '-'}</td>
                       <td className="px-4 py-3 text-[#6f4358]">{texto(registro.empresa)}</td>
                       <td className="px-4 py-3 text-[#6f4358]">{texto(registro.servico)}</td>
                       <td className="px-4 py-3 text-[#6f4358]">{texto(registro.destino)}</td>
+                      <td className="px-4 py-3 text-[#6f4358]">{texto(registro.responsavel)}</td>
+                      <td className="px-4 py-3 text-[#6f4358]">
+                        <div className="space-y-1">
+                          <p>{texto(registro.operador_entrada_nome)}</p>
+                          <p className="text-xs">{texto(registro.operador_entrada_email)}</p>
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-[#6f4358]">
                         {registro.entrada_evento ? (
                           <div className="space-y-1">
@@ -588,7 +629,30 @@ export default function Admin() {
                             <p className="text-xs leading-5">{texto(registro.itens_entrada)}</p>
                           </div>
                         ) : (
-                          '-'
+                            '-'
+                          )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {registro.evento_lista_foto_url ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setImagemAberta({
+                                alt: `Anexo do evento de ${registro.nome}`,
+                                src: registro.evento_lista_foto_url || '',
+                              })
+                            }
+                            className="size-12 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={registro.evento_lista_foto_url}
+                              alt={`Anexo do evento de ${registro.nome}`}
+                              className="h-full w-full object-cover"
+                            />
+                          </button>
+                        ) : (
+                          <span className="text-[#6f4358]">-</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-[#6f4358]">{formatarData(registro.hora_entrada)}</td>
@@ -605,7 +669,7 @@ export default function Admin() {
                   ))}
                   {registros.length === 0 && (dataInicio || dataFim || pesquisaRegistro.trim()) && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-[#8a2d55]">
+                      <td colSpan={13} className="px-4 py-8 text-center text-[#8a2d55]">
                         Nenhum registro encontrado.
                       </td>
                     </tr>

@@ -7,6 +7,7 @@ import { ImageLightbox } from '../components/ImageLightbox'
 import { lerUsuarioLogado, limparSessaoUsuario } from '../lib/auth'
 import { registrarLog } from '../lib/logs'
 import { otimizarFoto } from '../lib/photo'
+import { exportarRelatorioExcel, exportarRelatorioPdf } from '../lib/reports'
 import { supabase } from '../lib/supabase'
 
 type Perfil = 'admin' | 'porteiro'
@@ -40,6 +41,8 @@ type FormularioEvento = {
 type Registro = {
   id: string
   nome: string
+  operador_entrada_email?: string | null
+  operador_entrada_nome?: string | null
   documento?: string | null
   telefone?: string | null
   empresa?: string | null
@@ -169,6 +172,24 @@ function limparNumero(valor: string) {
   return valor.replace(/\D/g, '')
 }
 
+function formatarCpf(valor?: string | null) {
+  const numeros = limparNumero(valor || '').slice(0, 11)
+
+  return numeros
+    .replace(/^(\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1-$2')
+}
+
+function formatarTelefone(valor?: string | null) {
+  const numeros = limparNumero(valor || '').slice(0, 11)
+
+  if (numeros.length <= 2) return numeros
+  if (numeros.length <= 7) return `(${numeros.slice(0, 2)}) ${numeros.slice(2)}`
+
+  return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7)}`
+}
+
 function traduzirErroUpload(message: string) {
   const mensagem = message.toLowerCase()
 
@@ -261,6 +282,7 @@ export default function Porteiro() {
   const [consultaDataFim, setConsultaDataFim] = useState('')
   const [consultaPesquisa, setConsultaPesquisa] = useState('')
   const [consultaFiltro, setConsultaFiltro] = useState<FiltroConsulta>('todos')
+  const [consultaSelecionados, setConsultaSelecionados] = useState<string[]>([])
   const [registrosExpandidos, setRegistrosExpandidos] = useState<string[]>([])
   const [saidaEventoMateriais, setSaidaEventoMateriais] = useState<MaterialEvento[]>([])
   const [cameraAberta, setCameraAberta] = useState(false)
@@ -454,6 +476,14 @@ export default function Porteiro() {
 
     return `${total} ${sufixo} ${filtro}.`
   }, [consultaExecutada, consultaFiltro, consultaRegistrosFiltrados])
+
+  const registrosSelecionadosParaExportacao = useMemo(() => {
+    const selecionados = consultaRegistrosFiltrados.filter((registro) =>
+      consultaSelecionados.includes(registro.id)
+    )
+
+    return selecionados.length ? selecionados : consultaRegistrosFiltrados
+  }, [consultaRegistrosFiltrados, consultaSelecionados])
 
   function alterarCampo(campo: keyof FormularioEntrada, valor: string) {
     const proximoValor =
@@ -714,13 +744,13 @@ export default function Porteiro() {
       return false
     }
 
-    if (!form.documento.trim()) {
-      setErro('Documento e obrigatorio e deve conter apenas numeros.')
+    if (form.documento.trim().length !== 11) {
+      setErro('CPF obrigatorio. Informe os 11 digitos para continuar.')
       return false
     }
 
-    if (!form.telefone.trim()) {
-      setErro('Telefone e obrigatorio.')
+    if (form.telefone.trim().length !== 11) {
+      setErro('Telefone obrigatorio. Informe DDD e os 9 digitos do numero.')
       return false
     }
 
@@ -750,8 +780,8 @@ export default function Porteiro() {
         return false
       }
 
-      if (!eventoForm.fone.trim()) {
-        setErro('Informe o telefone do evento para continuar.')
+      if (eventoForm.fone.trim().length !== 11) {
+        setErro('Informe o telefone do evento com DDD e 9 digitos para continuar.')
         return false
       }
 
@@ -833,6 +863,8 @@ export default function Porteiro() {
 
       const novoRegistro = {
         nome: form.nome.trim(),
+        operador_entrada_email: usuario?.email || null,
+        operador_entrada_nome: usuario?.nome || null,
         documento: form.documento.trim(),
         telefone: form.telefone.trim(),
         empresa: form.empresa.trim(),
@@ -912,6 +944,8 @@ export default function Porteiro() {
 
     const novoRegistro = {
       nome: registro.nome,
+      operador_entrada_email: usuario?.email || null,
+      operador_entrada_nome: usuario?.nome || null,
       documento: registro.documento || '',
       telefone: registro.telefone || '',
       empresa: registro.empresa || '',
@@ -1006,6 +1040,27 @@ export default function Porteiro() {
 
     setConsultaExecutada(true)
     setConsultaRegistros((data || []) as Registro[])
+    setConsultaSelecionados([])
+  }
+
+  function exportarConsultaExcel() {
+    if (!consultaRegistrosFiltrados.length) {
+      setErro('Consulte os registros antes de exportar o Excel.')
+      return
+    }
+
+    setErro('')
+    exportarRelatorioExcel(registrosSelecionadosParaExportacao)
+  }
+
+  async function exportarConsultaPdf() {
+    if (!consultaRegistrosFiltrados.length) {
+      setErro('Consulte os registros antes de exportar o PDF.')
+      return
+    }
+
+    setErro('')
+    await exportarRelatorioPdf(registrosSelecionadosParaExportacao)
   }
 
   function limparConsulta() {
@@ -1015,6 +1070,21 @@ export default function Porteiro() {
     setConsultaPesquisa('')
     setConsultaFiltro('todos')
     setConsultaRegistros([])
+    setConsultaSelecionados([])
+  }
+
+  function toggleConsultaSelecionado(id: string) {
+    setConsultaSelecionados((atual) =>
+      atual.includes(id) ? atual.filter((item) => item !== id) : [...atual, id]
+    )
+  }
+
+  function toggleSelecionarTodosConsulta() {
+    const idsVisiveis = consultaRegistrosFiltrados.map((registro) => registro.id)
+
+    setConsultaSelecionados((atual) =>
+      idsVisiveis.every((id) => atual.includes(id)) ? [] : idsVisiveis
+    )
   }
 
   function toggleRegistroExpandido(id: string) {
@@ -1132,14 +1202,14 @@ export default function Porteiro() {
 
               <label className="block">
                 <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-                  Documento *
+                  CPF *
                 </span>
                 <input
-                  value={form.documento}
+                  value={formatarCpf(form.documento)}
                   onChange={(event) => alterarCampo('documento', event.target.value)}
                   className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
                   inputMode="numeric"
-                  pattern="[0-9]*"
+                  placeholder="000.000.000-00"
                   required
                 />
               </label>
@@ -1147,11 +1217,11 @@ export default function Porteiro() {
               <label className="block">
                 <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Telefone *</span>
                 <input
-                  value={form.telefone}
+                  value={formatarTelefone(form.telefone)}
                   onChange={(event) => alterarCampo('telefone', event.target.value)}
                   className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
                   inputMode="numeric"
-                  pattern="[0-9]*"
+                  placeholder="(00) 00000-0000"
                   required
                 />
               </label>
@@ -1379,7 +1449,7 @@ export default function Porteiro() {
                   <input
                     value={buscaDentro}
                     onChange={(event) => setBuscaDentro(event.target.value)}
-                    placeholder="Pesquisar nome ou documento"
+                    placeholder="Pesquisar nome ou CPF"
                     className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs"
                   />
                 </div>
@@ -1429,7 +1499,7 @@ export default function Porteiro() {
                       <p className="break-words font-bold">{registro.nome}</p>
                       {registro.documento && (
                         <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55]">
-                          {registro.documento}
+                          {formatarCpf(registro.documento)}
                         </span>
                       )}
                     </div>
@@ -1456,7 +1526,7 @@ export default function Porteiro() {
                         <p className="mt-1"><strong>OS numero:</strong> {texto(registro.evento_os_numero)}</p>
                         <p className="mt-1"><strong>Recebimento em:</strong> {texto(registro.evento_recebimento_em)}</p>
                         <p className="mt-1"><strong>Responsavel:</strong> {texto(registro.evento_responsavel)}</p>
-                        <p className="mt-1"><strong>Fone:</strong> {texto(registro.evento_fone)}</p>
+                        <p className="mt-1"><strong>Fone:</strong> {formatarTelefone(registro.evento_fone) || '-'}</p>
                         <p className="mt-1"><strong>Itens:</strong> {texto(registro.itens_entrada)}</p>
                         {registro.evento_lista_foto_url && (
                           <button
@@ -1506,7 +1576,7 @@ export default function Porteiro() {
                       setBuscaSaidos(valor)
                       void carregarSaidos(valor)
                     }}
-                    placeholder="Pesquisar nome ou documento"
+                    placeholder="Pesquisar nome ou CPF"
                     className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs"
                   />
                 </div>
@@ -1556,7 +1626,7 @@ export default function Porteiro() {
                         <p className="break-words font-bold">{registro.nome}</p>
                         {registro.documento && (
                           <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55]">
-                            {registro.documento}
+                            {formatarCpf(registro.documento)}
                           </span>
                         )}
                       </div>
@@ -1588,13 +1658,13 @@ export default function Porteiro() {
                   <div>
                     <h2 className="text-lg font-bold">Pessoas dentro do hotel</h2>
                     <p className="mt-1 text-sm text-[#6f4358]">
-                      Consulta rapida por nome ou documento dos visitantes que ainda estao dentro.
+                      Consulta rapida por nome ou CPF dos visitantes que ainda estao dentro.
                     </p>
                   </div>
                   <input
                     value={buscaHospedesDentro}
                     onChange={(event) => setBuscaHospedesDentro(event.target.value)}
-                    placeholder="Pesquisar nome ou documento"
+                    placeholder="Pesquisar nome ou CPF"
                     className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs"
                   />
                 </div>
@@ -1644,7 +1714,7 @@ export default function Porteiro() {
                         <p className="break-words font-bold">{registro.nome}</p>
                         {registro.documento && (
                           <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55]">
-                            {registro.documento}
+                            {formatarCpf(registro.documento)}
                           </span>
                         )}
                       </div>
@@ -1703,11 +1773,29 @@ export default function Porteiro() {
               onSubmit={consultarRegistros}
               className="flex flex-col gap-4 border-b border-[#f0e3e8] px-4 py-4 sm:px-5"
             >
-              <div>
-                <h2 className="text-lg font-bold">Consultar</h2>
-                <p className="mt-1 text-sm text-[#6f4358]">
-                  Pesquise registros por periodo, nome, documento e situacao operacional.
-                </p>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-lg font-bold">Consultar</h2>
+                  <p className="mt-1 text-sm text-[#6f4358]">
+                    Pesquise registros por periodo, nome, CPF e situacao operacional.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={exportarConsultaExcel}
+                    className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                  >
+                    Exportar Excel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void exportarConsultaPdf()}
+                    className="rounded-md bg-[#97003f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#7b0034]"
+                  >
+                    Exportar PDF
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 gap-3 rounded-lg bg-[#fffafb] p-3 lg:grid-cols-[180px_180px_minmax(220px,1fr)_auto_auto]">
@@ -1733,12 +1821,12 @@ export default function Porteiro() {
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-                    Pesquisar nome ou documento
+                    Pesquisar nome ou CPF
                   </span>
                   <input
                     value={consultaPesquisa}
                     onChange={(event) => setConsultaPesquisa(event.target.value)}
-                    placeholder="Ex.: Marcelo ou 123456789"
+                    placeholder="Ex.: Marcello ou 123456789"
                     className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
                   />
                 </label>
@@ -1788,6 +1876,27 @@ export default function Porteiro() {
                   </div>
                 )}
               </div>
+
+              {consultaRegistrosFiltrados.length > 0 && (
+                <div className="flex flex-col gap-2 text-sm text-[#8a2d55] sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    {consultaSelecionados.length > 0
+                      ? `${consultaSelecionados.length} registro(s) selecionado(s) para exportacao.`
+                      : 'Nenhum registro marcado. Se exportar agora, o sistema leva todos os resultados filtrados.'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleSelecionarTodosConsulta}
+                    className="self-start rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                  >
+                    {consultaRegistrosFiltrados.every((registro) =>
+                      consultaSelecionados.includes(registro.id)
+                    )
+                      ? 'Desmarcar todos'
+                      : 'Selecionar todos'}
+                  </button>
+                </div>
+              )}
             </form>
 
             {resumoConsulta && (
@@ -1797,16 +1906,18 @@ export default function Porteiro() {
             )}
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1080px] text-left text-sm">
+              <table className="w-full min-w-[1240px] text-left text-sm">
                 <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
                   <tr>
+                    <th className="px-4 py-3">Sel.</th>
                     <th className="px-4 py-3">Foto</th>
                     <th className="px-4 py-3">Nome</th>
-                    <th className="px-4 py-3">Documento</th>
+                    <th className="px-4 py-3">CPF</th>
                     <th className="px-4 py-3">Empresa</th>
                     <th className="px-4 py-3">Servico</th>
                     <th className="px-4 py-3">Destino</th>
                     <th className="px-4 py-3">Evento / Itens</th>
+                    <th className="px-4 py-3">Anexo</th>
                     <th className="px-4 py-3">Entrada</th>
                     <th className="px-4 py-3">Saida</th>
                     <th className="px-4 py-3">Situacao</th>
@@ -1815,7 +1926,7 @@ export default function Porteiro() {
                 <tbody className="divide-y divide-[#f3e8ed]">
                   {!consultaExecutada && !consultaDataInicio && !consultaDataFim && !consultaPesquisa.trim() && (
                     <tr>
-                      <td colSpan={10} className="px-4 py-8 text-center text-[#8a2d55]">
+                      <td colSpan={12} className="px-4 py-8 text-center text-[#8a2d55]">
                         Preencha uma data ou pesquisa para carregar os registros.
                       </td>
                     </tr>
@@ -1823,7 +1934,7 @@ export default function Porteiro() {
 
                   {consultaExecutada && consultaRegistrosFiltrados.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="px-4 py-8 text-center text-[#8a2d55]">
+                      <td colSpan={12} className="px-4 py-8 text-center text-[#8a2d55]">
                         Nenhum registro encontrado para o filtro selecionado.
                       </td>
                     </tr>
@@ -1838,6 +1949,14 @@ export default function Porteiro() {
 
                     return (
                       <tr key={`consulta-${registro.id}`} className="hover:bg-[#fffafb]">
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={consultaSelecionados.includes(registro.id)}
+                            onChange={() => toggleConsultaSelecionado(registro.id)}
+                            className="size-4 rounded border-[#d7b8c7] text-[#97003f] focus:ring-[#f3c7da]"
+                          />
+                        </td>
                         <td className="px-4 py-3">
                           <button
                             type="button"
@@ -1866,7 +1985,7 @@ export default function Porteiro() {
                           </button>
                         </td>
                         <td className="px-4 py-3 font-semibold">{texto(registro.nome)}</td>
-                        <td className="px-4 py-3 text-[#6f4358]">{texto(registro.documento)}</td>
+                        <td className="px-4 py-3 text-[#6f4358]">{formatarCpf(registro.documento) || '-'}</td>
                         <td className="px-4 py-3 text-[#6f4358]">{texto(registro.empresa)}</td>
                         <td className="px-4 py-3 text-[#6f4358]">{texto(registro.servico)}</td>
                         <td className="px-4 py-3 text-[#6f4358]">{texto(registro.destino)}</td>
@@ -1878,6 +1997,29 @@ export default function Porteiro() {
                             </div>
                           ) : (
                             '-'
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {registro.evento_lista_foto_url ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setImagemAberta({
+                                  alt: `Anexo do evento de ${registro.nome}`,
+                                  src: registro.evento_lista_foto_url || '',
+                                })
+                              }
+                              className="size-12 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={registro.evento_lista_foto_url}
+                                alt={`Anexo do evento de ${registro.nome}`}
+                                className="h-full w-full object-cover"
+                              />
+                            </button>
+                          ) : (
+                            <span className="text-[#6f4358]">-</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-[#6f4358]">{formatarData(registro.hora_entrada)}</td>
@@ -1964,9 +2106,10 @@ export default function Porteiro() {
                     <label className="block md:col-span-1">
                       <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Fone *</span>
                       <input
-                        value={eventoForm.fone}
+                        value={formatarTelefone(eventoForm.fone)}
                         onChange={(event) => alterarCampoEvento('fone', event.target.value)}
                         inputMode="numeric"
+                        placeholder="(00) 00000-0000"
                         className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
                       />
                     </label>
@@ -2163,8 +2306,8 @@ export default function Porteiro() {
 
             <div className="mt-4 rounded-lg bg-[#fffafb] p-4 text-sm text-[#4a2636]">
               <p><strong>Nome:</strong> {form.nome || '-'}</p>
-              <p className="mt-2"><strong>Documento:</strong> {form.documento || '-'}</p>
-              <p className="mt-2"><strong>Telefone:</strong> {form.telefone || '-'}</p>
+              <p className="mt-2"><strong>CPF:</strong> {formatarCpf(form.documento) || '-'}</p>
+              <p className="mt-2"><strong>Telefone:</strong> {formatarTelefone(form.telefone) || '-'}</p>
               <p className="mt-2"><strong>Servico:</strong> {form.servico || '-'}</p>
               <p className="mt-2"><strong>Destino:</strong> {form.destino || '-'}</p>
               <p className="mt-2"><strong>Responsavel:</strong> {form.responsavel || '-'}</p>
@@ -2182,7 +2325,7 @@ export default function Porteiro() {
                   <p className="mt-2"><strong>OS numero:</strong> {eventoForm.osNumero || '-'}</p>
                   <p className="mt-2"><strong>Recebimento em:</strong> {eventoForm.recebimentoEm || '-'}</p>
                   <p className="mt-2"><strong>Responsavel do evento:</strong> {eventoForm.responsavel || '-'}</p>
-                  <p className="mt-2"><strong>Fone do evento:</strong> {eventoForm.fone || '-'}</p>
+                  <p className="mt-2"><strong>Fone do evento:</strong> {formatarTelefone(eventoForm.fone) || '-'}</p>
                   <p className="mt-2">
                     <strong>Lista por foto:</strong> {eventoListaFotoPreview ? 'Anexada' : 'Nao anexada'}
                   </p>
@@ -2229,7 +2372,7 @@ export default function Porteiro() {
 
             <div className="mt-4 rounded-lg bg-[#fffafb] p-4 text-sm text-[#4a2636]">
               <p><strong>Nome:</strong> {confirmacaoAcao.registro.nome || '-'}</p>
-              <p className="mt-2"><strong>Documento:</strong> {confirmacaoAcao.registro.documento || '-'}</p>
+              <p className="mt-2"><strong>CPF:</strong> {formatarCpf(confirmacaoAcao.registro.documento) || '-'}</p>
               <p className="mt-2"><strong>Empresa:</strong> {confirmacaoAcao.registro.empresa || '-'}</p>
               {confirmacaoAcao.tipo === 'saida' ? (
                 <p className="mt-2"><strong>Entrada:</strong> {formatarData(confirmacaoAcao.registro.hora_entrada)}</p>
