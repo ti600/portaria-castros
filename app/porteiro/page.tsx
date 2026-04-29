@@ -28,6 +28,9 @@ type Registro = {
   servico?: string | null
   destino?: string | null
   responsavel?: string | null
+  entrada_evento?: boolean | null
+  evento_nome?: string | null
+  itens_entrada?: string | null
   foto_url?: string | null
   hora_entrada: string
   hora_saida?: string | null
@@ -47,6 +50,9 @@ type FormularioEntrada = {
   servico: string
   destino: string
   responsavel: string
+  entradaEvento: boolean
+  eventoNome: string
+  itensEntrada: string
 }
 
 const formularioInicial: FormularioEntrada = {
@@ -57,12 +63,25 @@ const formularioInicial: FormularioEntrada = {
   servico: '',
   destino: '',
   responsavel: '',
+  entradaEvento: false,
+  eventoNome: '',
+  itensEntrada: '',
 }
 
 const BUCKET_FOTOS = 'registros-fotos'
 const TAMANHO_MAXIMO_FOTO = 5 * 1024 * 1024
 function chaveRegistro(registro: Registro) {
   return `${(registro.documento || '').trim().toLowerCase()}::${registro.nome.trim().toLowerCase()}`
+}
+
+function ehMesmoDia(dataIso: string, referencia: Date) {
+  const data = new Date(dataIso)
+
+  return (
+    data.getFullYear() === referencia.getFullYear() &&
+    data.getMonth() === referencia.getMonth() &&
+    data.getDate() === referencia.getDate()
+  )
 }
 
 function identificarReentradas(registros: Registro[]) {
@@ -275,12 +294,42 @@ export default function Porteiro() {
 
     if (!termo) return []
 
-    return saidos.filter((registro) => {
+    const hoje = new Date()
+    const pessoasDentro = new Set(dentro.map((registro) => chaveRegistro(registro)))
+    const ultimoRegistroPorPessoa = new Map<string, Registro>()
+
+    saidos.forEach((registro) => {
+      if (!registro.hora_saida || !ehMesmoDia(registro.hora_saida, hoje)) {
+        return
+      }
+
+      const chave = chaveRegistro(registro)
+
+      if (pessoasDentro.has(chave)) {
+        return
+      }
+
+      const atual = ultimoRegistroPorPessoa.get(chave)
+
+      if (!atual) {
+        ultimoRegistroPorPessoa.set(chave, registro)
+        return
+      }
+
+      const horaAtual = new Date(atual.hora_saida || atual.hora_entrada).getTime()
+      const horaNova = new Date(registro.hora_saida || registro.hora_entrada).getTime()
+
+      if (horaNova > horaAtual) {
+        ultimoRegistroPorPessoa.set(chave, registro)
+      }
+    })
+
+    return Array.from(ultimoRegistroPorPessoa.values()).filter((registro) => {
       const nome = registro.nome.toLowerCase()
       const documento = (registro.documento || '').toLowerCase()
       return nome.includes(termo) || documento.includes(termo)
     })
-  }, [buscaSaidos, saidos])
+  }, [buscaSaidos, dentro, saidos])
 
   const consultaRegistrosFiltrados = useMemo(() => {
     if (!consultaRegistros.length) return []
@@ -464,6 +513,11 @@ export default function Porteiro() {
       return false
     }
 
+    if (form.entradaEvento && !form.eventoNome.trim()) {
+      setErro('Informe o nome do evento para continuar.')
+      return false
+    }
+
     return true
   }
 
@@ -505,6 +559,9 @@ export default function Porteiro() {
         servico: form.servico.trim(),
         destino: form.destino.trim(),
         responsavel: form.responsavel.trim(),
+        entrada_evento: form.entradaEvento,
+        evento_nome: form.entradaEvento ? form.eventoNome.trim() : null,
+        itens_entrada: form.entradaEvento ? form.itensEntrada.trim() : null,
         hora_entrada: new Date().toISOString(),
         ...(fotoUrl ? { foto_url: fotoUrl } : {}),
       }
@@ -819,7 +876,7 @@ export default function Porteiro() {
                 />
               </label>
 
-              <label className="block sm:col-span-2">
+              <label className="block">
                 <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
                   Responsavel
                 </span>
@@ -829,6 +886,67 @@ export default function Porteiro() {
                   className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
                 />
               </label>
+
+              <div className="block">
+                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
+                  Entrada para evento?
+                </span>
+                <div className="inline-flex rounded-lg border border-[#e5d4dc] bg-white p-1 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setForm((atual) => ({ ...atual, entradaEvento: false, eventoNome: '', itensEntrada: '' }))}
+                    className={`rounded-md px-4 py-2 text-sm font-bold transition ${
+                      !form.entradaEvento
+                        ? 'bg-[#97003f] text-white'
+                        : 'text-[#6f4358] hover:bg-[#fff0f6]'
+                    }`}
+                  >
+                    Nao
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((atual) => ({ ...atual, entradaEvento: true }))}
+                    className={`rounded-md px-4 py-2 text-sm font-bold transition ${
+                      form.entradaEvento
+                        ? 'bg-[#97003f] text-white'
+                        : 'text-[#6f4358] hover:bg-[#fff0f6]'
+                    }`}
+                  >
+                    Sim
+                  </button>
+                </div>
+              </div>
+
+              {form.entradaEvento && (
+                <>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
+                      Nome do evento
+                    </span>
+                    <input
+                      value={form.eventoNome}
+                      onChange={(event) =>
+                        setForm((atual) => ({ ...atual, eventoNome: event.target.value }))
+                      }
+                      className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                    />
+                  </label>
+
+                  <label className="block sm:col-span-2">
+                    <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
+                      Descricao de entrada de itens
+                    </span>
+                    <textarea
+                      value={form.itensEntrada}
+                      onChange={(event) =>
+                        setForm((atual) => ({ ...atual, itensEntrada: event.target.value }))
+                      }
+                      rows={3}
+                      className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                    />
+                  </label>
+                </>
+              )}
 
               <div className="sm:col-span-2">
                 <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
@@ -1381,6 +1499,13 @@ export default function Porteiro() {
               <p className="mt-2"><strong>Documento:</strong> {form.documento || '-'}</p>
               <p className="mt-2"><strong>Destino:</strong> {form.destino || '-'}</p>
               <p className="mt-2"><strong>Responsavel:</strong> {form.responsavel || '-'}</p>
+              <p className="mt-2"><strong>Entrada para evento:</strong> {form.entradaEvento ? 'Sim' : 'Nao'}</p>
+              {form.entradaEvento && (
+                <>
+                  <p className="mt-2"><strong>Nome do evento:</strong> {form.eventoNome || '-'}</p>
+                  <p className="mt-2"><strong>Itens de entrada:</strong> {form.itensEntrada || '-'}</p>
+                </>
+              )}
             </div>
 
             <div className="mt-5 flex flex-wrap justify-end gap-2">
