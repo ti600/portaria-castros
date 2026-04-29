@@ -156,6 +156,7 @@ export default function Porteiro() {
   const [buscaSaidos, setBuscaSaidos] = useState('')
   const [saidos, setSaidos] = useState<Registro[]>([])
   const [consultaRegistros, setConsultaRegistros] = useState<Registro[]>([])
+  const [consultaExecutada, setConsultaExecutada] = useState(false)
   const [consultaDataInicio, setConsultaDataInicio] = useState('')
   const [consultaDataFim, setConsultaDataFim] = useState('')
   const [consultaPesquisa, setConsultaPesquisa] = useState('')
@@ -298,6 +299,27 @@ export default function Porteiro() {
 
     return consultaRegistros.filter((registro) => idsReentrada.has(registro.id))
   }, [consultaFiltro, consultaRegistros, idsReentrada])
+
+  const resumoConsulta = useMemo(() => {
+    if (!consultaExecutada) return ''
+
+    if (!consultaRegistrosFiltrados.length) {
+      return 'Nenhum registro encontrado para os filtros aplicados.'
+    }
+
+    const total = consultaRegistrosFiltrados.length
+    const sufixo = total === 1 ? 'registro encontrado' : 'registros encontrados'
+    const filtro =
+      consultaFiltro === 'todos'
+        ? 'em todos os status'
+        : consultaFiltro === 'dentro'
+          ? 'somente para pessoas dentro'
+          : consultaFiltro === 'reentrada'
+            ? 'somente para reentradas'
+            : 'somente para saidas'
+
+    return `${total} ${sufixo} ${filtro}.`
+  }, [consultaExecutada, consultaFiltro, consultaRegistrosFiltrados])
 
   function alterarCampo(campo: keyof FormularioEntrada, valor: string) {
     const proximoValor =
@@ -598,6 +620,7 @@ export default function Porteiro() {
     setErro('')
 
     if (!consultaDataInicio && !consultaDataFim && !consultaPesquisa.trim()) {
+      setConsultaExecutada(false)
       setConsultaRegistros([])
       return
     }
@@ -624,10 +647,12 @@ export default function Porteiro() {
       return
     }
 
+    setConsultaExecutada(true)
     setConsultaRegistros((data || []) as Registro[])
   }
 
   function limparConsulta() {
+    setConsultaExecutada(false)
     setConsultaDataInicio('')
     setConsultaDataFim('')
     setConsultaPesquisa('')
@@ -1246,6 +1271,12 @@ export default function Porteiro() {
               </div>
             </form>
 
+            {resumoConsulta && (
+              <div className="border-b border-[#f0e3e8] bg-[#fffafb] px-4 py-3 text-sm font-medium text-[#8a2d55] sm:px-5">
+                {resumoConsulta}
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1080px] text-left text-sm">
                 <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
@@ -1262,7 +1293,7 @@ export default function Porteiro() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f3e8ed]">
-                  {!consultaRegistros.length && !consultaDataInicio && !consultaDataFim && !consultaPesquisa.trim() && (
+                  {!consultaExecutada && !consultaDataInicio && !consultaDataFim && !consultaPesquisa.trim() && (
                     <tr>
                       <td colSpan={9} className="px-4 py-8 text-center text-[#8a2d55]">
                         Preencha uma data ou pesquisa para carregar os registros.
@@ -1270,7 +1301,7 @@ export default function Porteiro() {
                     </tr>
                   )}
 
-                  {consultaRegistros.length > 0 && consultaRegistrosFiltrados.length === 0 && (
+                  {consultaExecutada && consultaRegistrosFiltrados.length === 0 && (
                     <tr>
                       <td colSpan={9} className="px-4 py-8 text-center text-[#8a2d55]">
                         Nenhum registro encontrado para o filtro selecionado.
