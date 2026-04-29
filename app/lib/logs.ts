@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 export type AcaoLog =
   | 'entrada_registrada'
   | 'saida_registrada'
+  | 'reentrada_registrada'
   | 'foto_enviada'
   | 'usuario_criado'
   | 'usuario_status_alterado'
