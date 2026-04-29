@@ -190,6 +190,16 @@ function formatarTelefone(valor?: string | null) {
   return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7)}`
 }
 
+function resumirTexto(valor?: string | null, limite = 20) {
+  const textoNormalizado = (valor || '').trim()
+
+  if (textoNormalizado.length <= limite) {
+    return textoNormalizado || '-'
+  }
+
+  return `${textoNormalizado.slice(0, limite).trimEnd()}...`
+}
+
 function traduzirErroUpload(message: string) {
   const mensagem = message.toLowerCase()
 
@@ -532,13 +542,15 @@ export default function Porteiro() {
     setEventoListaFotoPreview('')
   }
 
-  function resetarEvento() {
+  function resetarEvento(fecharModal = true) {
     setEventoForm({
       ...formularioEventoInicial,
       materiais: [criarMaterialEvento()],
     })
     limparListaEvento()
-    setEventoModalAberto(false)
+    if (fecharModal) {
+      setEventoModalAberto(false)
+    }
   }
 
   function fecharCamera() {
@@ -1176,7 +1188,7 @@ export default function Porteiro() {
         </header>
 
         {erro && !erroFormularioEntrada && (
-          <div className="mb-5 rounded-md border border-[#f3b7cc] bg-[#fff0f6] px-4 py-3 text-sm font-medium text-[#97003f]">
+          <div className="mb-5 rounded-md border border-[#f1d38a] bg-[#fff7db] px-4 py-3 text-sm font-medium text-[#8a5a00]">
             {erro}
           </div>
         )}
@@ -1440,7 +1452,7 @@ export default function Porteiro() {
 
             <div ref={acoesEntradaRef} className="mt-5">
               {erroFormularioEntrada && (
-                <div className="mb-3 rounded-md border border-[#f3b7cc] bg-[#fff0f6] px-4 py-3 text-sm font-medium text-[#97003f]">
+                <div className="mb-3 rounded-md border border-[#f1d38a] bg-[#fff7db] px-4 py-3 text-sm font-medium text-[#8a5a00]">
                   {erroFormularioEntrada}
                 </div>
               )}
@@ -2025,7 +2037,7 @@ export default function Porteiro() {
                           {registro.entrada_evento ? (
                             <div className="space-y-1">
                               <p className="font-semibold text-[#4a2636]">{texto(registro.evento_nome)}</p>
-                              <p className="text-xs leading-5">{texto(registro.itens_entrada)}</p>
+                              <p className="text-xs leading-5">{resumirTexto(registro.itens_entrada, 20)}</p>
                             </div>
                           ) : (
                             '-'
@@ -2167,14 +2179,14 @@ export default function Porteiro() {
                     </div>
 
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[980px] text-left text-sm">
+                      <table className="w-full min-w-[820px] text-left text-sm">
                         <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
                           <tr>
-                            <th className="px-3 py-3">Qtde</th>
+                            <th className="w-[92px] px-3 py-3">Qtde</th>
                             <th className="px-3 py-3">Discriminacao</th>
-                            <th className="px-3 py-3">Data</th>
+                            <th className="w-[170px] px-3 py-3">Data</th>
                             <th className="px-3 py-3">Observacoes</th>
-                            <th className="px-3 py-3"></th>
+                            <th className="w-[110px] px-3 py-3"></th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#f3e8ed]">
@@ -2184,9 +2196,15 @@ export default function Porteiro() {
                                 <input
                                   value={material.quantidade}
                                   onChange={(event) =>
-                                    alterarMaterialEvento(material.id, 'quantidade', event.target.value)
+                                    alterarMaterialEvento(
+                                      material.id,
+                                      'quantidade',
+                                      limparNumero(event.target.value)
+                                    )
                                   }
-                                  className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                                  inputMode="numeric"
+                                  placeholder="0"
+                                  className="w-20 rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
                                 />
                               </td>
                               <td className="px-3 py-3">
@@ -2205,7 +2223,7 @@ export default function Porteiro() {
                                   onChange={(event) =>
                                     alterarMaterialEvento(material.id, 'data', event.target.value)
                                   }
-                                  className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                                  className="w-[152px] rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
                                 />
                               </td>
                               <td className="px-3 py-3">
@@ -2308,6 +2326,13 @@ export default function Porteiro() {
               </div>
 
               <div className="mt-5 flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => resetarEvento(false)}
+                  className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                >
+                  Limpar ficha
+                </button>
                 <button
                   type="button"
                   onClick={() => setEventoModalAberto(false)}

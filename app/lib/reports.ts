@@ -141,6 +141,20 @@ function quebrarTexto(doc: jsPDF, valor: string, largura: number) {
   return doc.splitTextToSize(valor || '-', largura)
 }
 
+function formatarItensParaPdf(valor?: string | null) {
+  const texto = limparTexto(valor)
+
+  if (!texto) return '-'
+
+  const textoComQuebra = texto.replace(/Lista de materiais anexada por foto\.\s*/i, 'Lista de materiais anexada por foto.\n')
+
+  return textoComQuebra
+    .split('|')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .join('\n')
+}
+
 export function exportarRelatorioExcel(registros: RegistroRelatorio[]) {
   const linhas = registros.map((registro) => ({
     Nome: limparTexto(registro.nome),
@@ -245,7 +259,7 @@ export async function exportarRelatorioPdf(registros: RegistroRelatorio[]) {
       ['Recebimento', registro.entrada_evento ? limparTexto(registro.evento_recebimento_em) || '-' : '-'],
       ['Responsavel evento', registro.entrada_evento ? limparTexto(registro.evento_responsavel) || '-' : '-'],
       ['Fone evento', registro.entrada_evento ? formatarTelefone(registro.evento_fone) || '-' : '-'],
-      ['Itens', registro.entrada_evento ? limparTexto(registro.itens_entrada) || '-' : '-'],
+      ['Itens', registro.entrada_evento ? formatarItensParaPdf(registro.itens_entrada) || '-' : '-'],
       ['Entrada', formatarData(registro.hora_entrada)],
       ['Saida', formatarData(registro.hora_saida)],
     ] as const
