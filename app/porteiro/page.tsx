@@ -33,6 +33,10 @@ type Registro = {
   hora_saida?: string | null
 }
 
+type ConfirmacaoAcao =
+  | { tipo: 'saida'; registro: Registro }
+  | { tipo: 'reentrada'; registro: Registro }
+
 type FormularioEntrada = {
   nome: string
   documento: string
@@ -122,11 +126,16 @@ export default function Porteiro() {
   const [fotoPreview, setFotoPreview] = useState('')
   const [imagemAberta, setImagemAberta] = useState<{ alt: string; src: string } | null>(null)
   const [buscaDentro, setBuscaDentro] = useState('')
+  const [buscaSaidos, setBuscaSaidos] = useState('')
+  const [saidos, setSaidos] = useState<Registro[]>([])
   const [cameraAberta, setCameraAberta] = useState(false)
+  const [confirmacaoEntradaAberta, setConfirmacaoEntradaAberta] = useState(false)
+  const [confirmacaoAcao, setConfirmacaoAcao] = useState<ConfirmacaoAcao | null>(null)
   const [carregandoCamera, setCarregandoCamera] = useState(false)
   const [carregando, setCarregando] = useState(true)
   const [salvandoEntrada, setSalvandoEntrada] = useState(false)
   const [registrandoSaida, setRegistrandoSaida] = useState<string | null>(null)
+  const [registrandoReentrada, setRegistrandoReentrada] = useState<string | null>(null)
   const [erro, setErro] = useState('')
   const router = useRouter()
 
@@ -145,6 +154,27 @@ export default function Porteiro() {
     setDentro((data || []) as Registro[])
   }
 
+  async function carregarSaidos(termo = '') {
+    let query = supabase
+      .from('registros')
+      .select('*')
+      .not('hora_saida', 'is', null)
+      .order('hora_saida', { ascending: false })
+
+    if (termo.trim()) {
+      query = query.or(`nome.ilike.%${termo.trim()}%,documento.ilike.%${termo.trim()}%`)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      setErro('Nao foi possivel carregar os visitantes que ja sairam.')
+      return
+    }
+
+    setSaidos((data || []) as Registro[])
+  }
+
   useEffect(() => {
     const usuarioLogado = lerUsuarioLogado()
 
@@ -157,7 +187,7 @@ export default function Porteiro() {
       setUsuario(usuarioLogado)
       setCarregando(true)
       setErro('')
-      await carregarDentro()
+      await Promise.all([carregarDentro(), carregarSaidos()])
       setCarregando(false)
     }
 
@@ -198,6 +228,18 @@ export default function Porteiro() {
 
     return dentroFiltrado.slice(0, LIMITE_VISUAL_DENTRO)
   }, [buscaDentro, dentroFiltrado])
+
+  const saidosFiltrados = useMemo(() => {
+    const termo = buscaSaidos.trim().toLowerCase()
+
+    if (!termo) return saidos
+
+    return saidos.filter((registro) => {
+      const nome = registro.nome.toLowerCase()
+      const documento = (registro.documento || '').toLowerCase()
+      return nome.includes(termo) || documento.includes(termo)
+    })
+  }, [buscaSaidos, saidos])
 
   function alterarCampo(campo: keyof FormularioEntrada, valor: string) {
     const proximoValor =
@@ -329,17 +371,35 @@ export default function Porteiro() {
     fecharCamera()
   }
 
-  async function registrarEntrada(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  function validarEntrada() {
     setErro('')
 
     if (!form.nome.trim()) {
       setErro('Informe um nome valido usando apenas letras.')
-      return
+      return false
     }
 
     if (!form.documento.trim()) {
       setErro('Documento e obrigatorio e deve conter apenas numeros.')
+      return false
+    }
+
+    return true
+  }
+
+  function solicitarConfirmacaoEntrada(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!validarEntrada()) {
+      return
+    }
+
+    setConfirmacaoEntradaAberta(true)
+  }
+
+  async function confirmarEntrada() {
+    if (!validarEntrada()) {
+      setConfirmacaoEntradaAberta(false)
       return
     }
 
@@ -384,7 +444,8 @@ export default function Porteiro() {
 
       setForm(formularioInicial)
       limparFoto()
-      await carregarDentro()
+      setConfirmacaoEntradaAberta(false)
+      await Promise.all([carregarDentro(), carregarSaidos(buscaSaidos)])
     } catch (error) {
       setErro(error instanceof Error ? error.message : 'Nao foi possivel registrar a entrada.')
     } finally {
@@ -392,7 +453,7 @@ export default function Porteiro() {
     }
   }
 
-  async function registrarSaida(id: string, nome: string) {
+  async function executarSaida(id: string, nome: string) {
     setErro('')
     setRegistrandoSaida(id)
 
@@ -415,13 +476,62 @@ export default function Porteiro() {
       usuarioNome: usuario?.nome,
     })
 
-    await carregarDentro()
+    await Promise.all([carregarDentro(), carregarSaidos(buscaSaidos)])
+  }
+
+  async function executarReentrada(registro: Registro) {
+    setErro('')
+    setRegistrandoReentrada(registro.id)
+
+    const novoRegistro = {
+      nome: registro.nome,
+      documento: registro.documento || '',
+      telefone: registro.telefone || '',
+      empresa: registro.empresa || '',
+      servico: registro.servico || '',
+      destino: registro.destino || '',
+      responsavel: registro.responsavel || '',
+      hora_entrada: new Date().toISOString(),
+      ...(registro.foto_url ? { foto_url: registro.foto_url } : {}),
+    }
+
+    const { error } = await supabase.from('registros').insert(novoRegistro)
+
+    setRegistrandoReentrada(null)
+
+    if (error) {
+      setErro('Nao foi possivel registrar a reentrada.')
+      return
+    }
+
+    await registrarLog({
+      acao: 'reentrada_registrada',
+      detalhes: `Reentrada registrada para ${registro.nome}.`,
+      usuarioEmail: usuario?.email,
+      usuarioNome: usuario?.nome,
+    })
+
+    await Promise.all([carregarDentro(), carregarSaidos(buscaSaidos)])
+  }
+
+  async function confirmarAcaoPendente() {
+    if (!confirmacaoAcao) return
+
+    if (confirmacaoAcao.tipo === 'saida') {
+      await executarSaida(confirmacaoAcao.registro.id, confirmacaoAcao.registro.nome)
+    }
+
+    if (confirmacaoAcao.tipo === 'reentrada') {
+      await executarReentrada(confirmacaoAcao.registro)
+    }
+
+    setConfirmacaoAcao(null)
   }
 
   async function atualizarLista() {
     setCarregando(true)
     setErro('')
-    await carregarDentro()
+    await Promise.all([carregarDentro(), carregarSaidos(buscaSaidos)])
     setCarregando(false)
   }
 
@@ -509,7 +619,7 @@ export default function Porteiro() {
 
         <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
           <form
-            onSubmit={registrarEntrada}
+            onSubmit={solicitarConfirmacaoEntrada}
             className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm sm:p-5"
           >
             <div className="mb-5">
@@ -661,34 +771,47 @@ export default function Porteiro() {
               <div className="hidden" aria-hidden="true" />
             )}
 
-            <button
-              type="submit"
-              disabled={salvandoEntrada}
-              className="mt-5 w-full rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
-            >
-              {salvandoEntrada ? 'Registrando...' : 'Registrar entrada'}
-            </button>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                type="submit"
+                disabled={salvandoEntrada}
+                className="rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
+              >
+                {salvandoEntrada ? 'Registrando...' : 'Registrar entrada'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setForm(formularioInicial)
+                  limparFoto()
+                }}
+                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-3 font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+              >
+                Cancelar
+              </button>
+            </div>
           </form>
 
-          <div className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
-            <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h2 className="text-lg font-bold">Pessoas dentro</h2>
-                  <p className="mt-1 text-sm text-[#6f4358]">
-                    Visualizacao rapida dos visitantes ainda ativos na portaria.
-                  </p>
+          <div className="grid gap-5">
+            <div className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
+              <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold">Registrar saida</h2>
+                    <p className="mt-1 text-sm text-[#6f4358]">
+                      Visualizacao rapida dos visitantes ainda ativos na portaria.
+                    </p>
+                  </div>
+                  <input
+                    value={buscaDentro}
+                    onChange={(event) => setBuscaDentro(event.target.value)}
+                    placeholder="Pesquisar nome ou documento"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs"
+                  />
                 </div>
-                <input
-                  value={buscaDentro}
-                  onChange={(event) => setBuscaDentro(event.target.value)}
-                  placeholder="Pesquisar nome ou documento"
-                  className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs"
-                />
               </div>
-            </div>
 
-            <div className="divide-y divide-[#f3e8ed]">
+              <div className="divide-y divide-[#f3e8ed]">
               {dentroFiltrado.length === 0 && (
                 <p className="px-4 py-8 text-center text-sm text-[#8a2d55]">
                   Nenhum visitante encontrado.
@@ -745,7 +868,7 @@ export default function Porteiro() {
 
                   <button
                     type="button"
-                    onClick={() => registrarSaida(registro.id, registro.nome)}
+                    onClick={() => setConfirmacaoAcao({ tipo: 'saida', registro })}
                     disabled={registrandoSaida === registro.id}
                     className="rounded-md bg-[#97003f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
                   >
@@ -760,9 +883,189 @@ export default function Porteiro() {
                 </div>
               )}
             </div>
+            </div>
+
+            <div className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
+              <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold">Reentrada</h2>
+                    <p className="mt-1 text-sm text-[#6f4358]">
+                      Consulte quem ja saiu e registre o retorno sem preencher tudo de novo.
+                    </p>
+                  </div>
+                  <input
+                    value={buscaSaidos}
+                    onChange={(event) => {
+                      const valor = event.target.value
+                      setBuscaSaidos(valor)
+                      void carregarSaidos(valor)
+                    }}
+                    placeholder="Pesquisar nome ou documento"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="divide-y divide-[#f3e8ed]">
+                {saidosFiltrados.length === 0 && (
+                  <p className="px-4 py-8 text-center text-sm text-[#8a2d55]">
+                    Nenhum visitante com saida registrada foi encontrado.
+                  </p>
+                )}
+
+                {saidosFiltrados.map((registro) => (
+                  <div
+                    key={`saida-${registro.id}`}
+                    className="grid gap-4 px-4 py-4 sm:grid-cols-[56px_1fr_auto] sm:items-center"
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        registro.foto_url
+                          ? setImagemAberta({
+                              alt: `Foto de ${registro.nome}`,
+                              src: registro.foto_url,
+                            })
+                          : undefined
+                      }
+                      className="size-14 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
+                    >
+                      {registro.foto_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={registro.foto_url}
+                          alt={`Foto de ${registro.nome}`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="grid h-full place-items-center text-sm font-black text-[#97003f]">
+                          {registro.nome?.charAt(0).toUpperCase() || '?'}
+                        </div>
+                      )}
+                    </button>
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="break-words font-bold">{registro.nome}</p>
+                        {registro.documento && (
+                          <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55]">
+                            {registro.documento}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 break-words text-sm text-[#6f4358]">
+                        {texto(registro.empresa)} · {texto(registro.servico)} · {texto(registro.destino)}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-[#8a2d55]">
+                        Saida: {formatarData(registro.hora_saida || '')}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setConfirmacaoAcao({ tipo: 'reentrada', registro })}
+                      disabled={registrandoReentrada === registro.id}
+                      className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
+                    >
+                      {registrandoReentrada === registro.id ? 'Salvando...' : 'Registrar reentrada'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
       </div>
+
+      {confirmacaoEntradaAberta && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2b1420]/70 p-4">
+          <div className="w-full max-w-lg rounded-xl border border-[#eadde3] bg-white p-5 shadow-xl">
+            <h2 className="text-lg font-bold text-[#2b1420]">Confirmar entrada</h2>
+            <p className="mt-2 text-sm text-[#6f4358]">
+              Confira os dados antes de registrar a entrada do visitante.
+            </p>
+
+            <div className="mt-4 rounded-lg bg-[#fffafb] p-4 text-sm text-[#4a2636]">
+              <p><strong>Nome:</strong> {form.nome || '-'}</p>
+              <p className="mt-2"><strong>Documento:</strong> {form.documento || '-'}</p>
+              <p className="mt-2"><strong>Destino:</strong> {form.destino || '-'}</p>
+              <p className="mt-2"><strong>Responsavel:</strong> {form.responsavel || '-'}</p>
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmacaoEntradaAberta(false)}
+                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarEntrada}
+                disabled={salvandoEntrada}
+                className="rounded-md bg-[#97003f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
+              >
+                {salvandoEntrada ? 'Registrando...' : 'Confirmar entrada'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmacaoAcao && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2b1420]/70 p-4">
+          <div className="w-full max-w-lg rounded-xl border border-[#eadde3] bg-white p-5 shadow-xl">
+            <h2 className="text-lg font-bold text-[#2b1420]">
+              {confirmacaoAcao.tipo === 'saida' ? 'Confirmar saida' : 'Confirmar reentrada'}
+            </h2>
+            <p className="mt-2 text-sm text-[#6f4358]">
+              {confirmacaoAcao.tipo === 'saida'
+                ? 'Confirme para registrar a saida deste visitante.'
+                : 'Confirme para registrar a reentrada deste visitante.'}
+            </p>
+
+            <div className="mt-4 rounded-lg bg-[#fffafb] p-4 text-sm text-[#4a2636]">
+              <p><strong>Nome:</strong> {confirmacaoAcao.registro.nome || '-'}</p>
+              <p className="mt-2"><strong>Documento:</strong> {confirmacaoAcao.registro.documento || '-'}</p>
+              <p className="mt-2"><strong>Empresa:</strong> {confirmacaoAcao.registro.empresa || '-'}</p>
+              {confirmacaoAcao.tipo === 'saida' ? (
+                <p className="mt-2"><strong>Entrada:</strong> {formatarData(confirmacaoAcao.registro.hora_entrada)}</p>
+              ) : (
+                <p className="mt-2"><strong>Ultima saida:</strong> {formatarData(confirmacaoAcao.registro.hora_saida || '')}</p>
+              )}
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmacaoAcao(null)}
+                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarAcaoPendente}
+                disabled={
+                  (confirmacaoAcao.tipo === 'saida' && registrandoSaida === confirmacaoAcao.registro.id) ||
+                  (confirmacaoAcao.tipo === 'reentrada' && registrandoReentrada === confirmacaoAcao.registro.id)
+                }
+                className="rounded-md bg-[#97003f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
+              >
+                {confirmacaoAcao.tipo === 'saida'
+                  ? registrandoSaida === confirmacaoAcao.registro.id
+                    ? 'Registrando...'
+                    : 'Confirmar saida'
+                  : registrandoReentrada === confirmacaoAcao.registro.id
+                    ? 'Registrando...'
+                    : 'Confirmar reentrada'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {cameraAberta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2b1420]/70 p-4">
