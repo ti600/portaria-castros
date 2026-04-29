@@ -29,6 +29,9 @@ type Registro = {
   servico?: string | null
   destino?: string | null
   responsavel?: string | null
+  entrada_evento?: boolean | null
+  evento_nome?: string | null
+  itens_entrada?: string | null
   foto_url?: string | null
   hora_entrada?: string | null
   hora_saida?: string | null
@@ -531,6 +534,7 @@ export default function Admin() {
                     <th className="px-4 py-3">Empresa</th>
                     <th className="px-4 py-3">Servico</th>
                     <th className="px-4 py-3">Destino</th>
+                    <th className="px-4 py-3">Evento / Itens</th>
                     <th className="px-4 py-3">Entrada</th>
                     <th className="px-4 py-3">Saida</th>
                   </tr>
@@ -538,7 +542,7 @@ export default function Admin() {
                 <tbody className="divide-y divide-[#f3e8ed]">
                   {!registros.length && !dataInicio && !dataFim && !pesquisaRegistro.trim() && (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-[#8a2d55]">
+                      <td colSpan={9} className="px-4 py-8 text-center text-[#8a2d55]">
                         Preencha uma data ou pesquisa para carregar os registros.
                       </td>
                     </tr>
@@ -577,6 +581,16 @@ export default function Admin() {
                       <td className="px-4 py-3 text-[#6f4358]">{texto(registro.empresa)}</td>
                       <td className="px-4 py-3 text-[#6f4358]">{texto(registro.servico)}</td>
                       <td className="px-4 py-3 text-[#6f4358]">{texto(registro.destino)}</td>
+                      <td className="px-4 py-3 text-[#6f4358]">
+                        {registro.entrada_evento ? (
+                          <div className="space-y-1">
+                            <p className="font-semibold text-[#4a2636]">{texto(registro.evento_nome)}</p>
+                            <p className="text-xs leading-5">{texto(registro.itens_entrada)}</p>
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-[#6f4358]">{formatarData(registro.hora_entrada)}</td>
                       <td className="px-4 py-3">
                         {registro.hora_saida ? (
@@ -591,7 +605,7 @@ export default function Admin() {
                   ))}
                   {registros.length === 0 && (dataInicio || dataFim || pesquisaRegistro.trim()) && (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-[#8a2d55]">
+                      <td colSpan={9} className="px-4 py-8 text-center text-[#8a2d55]">
                         Nenhum registro encontrado.
                       </td>
                     </tr>

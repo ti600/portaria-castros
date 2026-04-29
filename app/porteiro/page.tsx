@@ -19,6 +19,24 @@ type Usuario = {
   ativo?: boolean | null
 }
 
+type MaterialEvento = {
+  id: string
+  quantidade: string
+  discriminacao: string
+  data: string
+  quantidadeSaida: string
+  observacoes: string
+}
+
+type FormularioEvento = {
+  nome: string
+  osNumero: string
+  recebimentoEm: string
+  responsavel: string
+  fone: string
+  materiais: MaterialEvento[]
+}
+
 type Registro = {
   id: string
   nome: string
@@ -30,6 +48,12 @@ type Registro = {
   responsavel?: string | null
   entrada_evento?: boolean | null
   evento_nome?: string | null
+  evento_os_numero?: string | null
+  evento_recebimento_em?: string | null
+  evento_responsavel?: string | null
+  evento_fone?: string | null
+  evento_lista_foto_url?: string | null
+  evento_materiais?: MaterialEvento[] | null
   itens_entrada?: string | null
   foto_url?: string | null
   hora_entrada: string
@@ -50,7 +74,7 @@ type FormularioEntrada = {
   servico: string
   destino: string
   responsavel: string
-  entradaEvento: boolean
+  entradaEvento: '' | 'sim' | 'nao'
   eventoNome: string
   itensEntrada: string
 }
@@ -63,9 +87,29 @@ const formularioInicial: FormularioEntrada = {
   servico: '',
   destino: '',
   responsavel: '',
-  entradaEvento: false,
+  entradaEvento: '',
   eventoNome: '',
   itensEntrada: '',
+}
+
+function criarMaterialEvento(): MaterialEvento {
+  return {
+    id: crypto.randomUUID(),
+    quantidade: '',
+    discriminacao: '',
+    data: new Date().toISOString().slice(0, 10),
+    quantidadeSaida: '',
+    observacoes: '',
+  }
+}
+
+const formularioEventoInicial: FormularioEvento = {
+  nome: '',
+  osNumero: '',
+  recebimentoEm: '',
+  responsavel: '',
+  fone: '',
+  materiais: [criarMaterialEvento()],
 }
 
 const BUCKET_FOTOS = 'registros-fotos'
@@ -161,14 +205,51 @@ async function enviarFoto(foto: File) {
   return data.publicUrl
 }
 
+async function lerArquivoComoDataUrl(arquivo: File) {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(new Error('Nao foi possivel gerar a pre-visualizacao da imagem.'))
+    reader.readAsDataURL(arquivo)
+  })
+}
+
+function formatarItensEvento(materiais: MaterialEvento[]) {
+  return materiais
+    .filter(
+      (material) =>
+        material.quantidade.trim() ||
+        material.discriminacao.trim() ||
+        material.data.trim() ||
+        material.observacoes.trim()
+    )
+    .map((material) => {
+      const partes = [
+        material.quantidade.trim() ? `${material.quantidade.trim()}x` : '',
+        material.discriminacao.trim(),
+        material.data.trim()
+          ? `(${new Intl.DateTimeFormat('pt-BR').format(new Date(`${material.data}T00:00:00`))})`
+          : '',
+        material.observacoes.trim() ? `- ${material.observacoes.trim()}` : '',
+      ].filter(Boolean)
+
+      return partes.join(' ')
+    })
+    .join(' | ')
+}
+
 export default function Porteiro() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const eventoListaInputRef = useRef<HTMLInputElement | null>(null)
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [dentro, setDentro] = useState<Registro[]>([])
   const [form, setForm] = useState<FormularioEntrada>(formularioInicial)
+  const [eventoForm, setEventoForm] = useState<FormularioEvento>(formularioEventoInicial)
   const [foto, setFoto] = useState<File | null>(null)
   const [fotoPreview, setFotoPreview] = useState('')
+  const [eventoListaFoto, setEventoListaFoto] = useState<File | null>(null)
+  const [eventoListaFotoPreview, setEventoListaFotoPreview] = useState('')
   const [imagemAberta, setImagemAberta] = useState<{ alt: string; src: string } | null>(null)
   const [buscaDentro, setBuscaDentro] = useState('')
   const [buscaHospedesDentro, setBuscaHospedesDentro] = useState('')
@@ -180,7 +261,11 @@ export default function Porteiro() {
   const [consultaDataFim, setConsultaDataFim] = useState('')
   const [consultaPesquisa, setConsultaPesquisa] = useState('')
   const [consultaFiltro, setConsultaFiltro] = useState<FiltroConsulta>('todos')
+  const [registrosExpandidos, setRegistrosExpandidos] = useState<string[]>([])
+  const [saidaEventoMateriais, setSaidaEventoMateriais] = useState<MaterialEvento[]>([])
   const [cameraAberta, setCameraAberta] = useState(false)
+  const [cameraDestino, setCameraDestino] = useState<'visitante' | 'listaEvento'>('visitante')
+  const [eventoModalAberto, setEventoModalAberto] = useState(false)
   const [confirmacaoEntradaAberta, setConfirmacaoEntradaAberta] = useState(false)
   const [confirmacaoAcao, setConfirmacaoAcao] = useState<ConfirmacaoAcao | null>(null)
   const [carregandoCamera, setCarregandoCamera] = useState(false)
@@ -390,14 +475,28 @@ export default function Porteiro() {
     setFotoPreview('')
   }
 
+  function limparListaEvento() {
+    setEventoListaFoto(null)
+    setEventoListaFotoPreview('')
+  }
+
+  function resetarEvento() {
+    setEventoForm({
+      ...formularioEventoInicial,
+      materiais: [criarMaterialEvento()],
+    })
+    limparListaEvento()
+    setEventoModalAberto(false)
+  }
+
   function fecharCamera() {
     streamRef.current?.getTracks().forEach((track) => track.stop())
     streamRef.current = null
     setCameraAberta(false)
+    setCameraDestino('visitante')
   }
 
-  function alterarFoto(event: ChangeEvent<HTMLInputElement>) {
-    const arquivo = event.target.files?.[0] || null
+  function processarArquivoVisitante(arquivo: File | null) {
     setErro('')
 
     if (!arquivo) {
@@ -425,9 +524,108 @@ export default function Porteiro() {
     setFotoPreview(URL.createObjectURL(arquivo))
   }
 
-  async function abrirCamera() {
+  async function processarArquivoListaEvento(arquivo: File | null) {
+    setErro('')
+
+    if (!arquivo) {
+      limparListaEvento()
+      return
+    }
+
+    if (!arquivo.type.startsWith('image/')) {
+      limparListaEvento()
+      setErro('Selecione uma imagem valida para a lista de materiais.')
+      return
+    }
+
+    if (arquivo.size > TAMANHO_MAXIMO_FOTO) {
+      limparListaEvento()
+      setErro('A foto da lista deve ter no maximo 5 MB.')
+      return
+    }
+
+    setEventoListaFoto(arquivo)
+    try {
+      setEventoListaFotoPreview(await lerArquivoComoDataUrl(arquivo))
+    } catch (error) {
+      limparListaEvento()
+      setErro(
+        error instanceof Error
+          ? error.message
+          : 'Nao foi possivel gerar a pre-visualizacao da lista do evento.'
+      )
+    }
+  }
+
+  function alterarFoto(event: ChangeEvent<HTMLInputElement>) {
+    processarArquivoVisitante(event.target.files?.[0] || null)
+  }
+
+  function alterarListaEvento(event: ChangeEvent<HTMLInputElement>) {
+    void processarArquivoListaEvento(event.target.files?.[0] || null)
+  }
+
+  function alterarCampoEvento(campo: Exclude<keyof FormularioEvento, 'materiais'>, valor: string) {
+    const proximoValor = campo === 'fone' ? limparNumero(valor) : valor
+    setEventoForm((atual) => ({ ...atual, [campo]: proximoValor }))
+  }
+
+  function alterarMaterialEvento(
+    materialId: string,
+    campo: Exclude<keyof MaterialEvento, 'id'>,
+    valor: string
+  ) {
+    setEventoForm((atual) => ({
+      ...atual,
+      materiais: atual.materiais.map((material) =>
+        material.id === materialId ? { ...material, [campo]: valor } : material
+      ),
+    }))
+  }
+
+  function adicionarMaterialEvento() {
+    setEventoForm((atual) => ({
+      ...atual,
+      materiais: [...atual.materiais, criarMaterialEvento()],
+    }))
+  }
+
+  function removerMaterialEvento(materialId: string) {
+    setEventoForm((atual) => ({
+      ...atual,
+      materiais:
+        atual.materiais.length === 1
+          ? [criarMaterialEvento()]
+          : atual.materiais.filter((material) => material.id !== materialId),
+    }))
+  }
+
+  function abrirConfirmacaoSaida(registro: Registro) {
+    setSaidaEventoMateriais(
+      (registro.evento_materiais || []).map((material, index) => ({
+        id: material.id || `material-${index}`,
+        quantidade: material.quantidade || '',
+        discriminacao: material.discriminacao || '',
+        data: material.data || '',
+        quantidadeSaida: material.quantidadeSaida || '',
+        observacoes: material.observacoes || '',
+      }))
+    )
+    setConfirmacaoAcao({ tipo: 'saida', registro })
+  }
+
+  function alterarSaidaMaterial(materialId: string, valor: string) {
+    setSaidaEventoMateriais((atual) =>
+      atual.map((material) =>
+        material.id === materialId ? { ...material, quantidadeSaida: valor } : material
+      )
+    )
+  }
+
+  async function abrirCamera(destino: 'visitante' | 'listaEvento' = 'visitante') {
     setErro('')
     setCarregandoCamera(true)
+    setCameraDestino(destino)
 
     try {
       streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -486,22 +684,30 @@ export default function Porteiro() {
       return
     }
 
-    if (fotoPreview) {
-      URL.revokeObjectURL(fotoPreview)
-    }
-
     const arquivo = new File([blob], `camera-${Date.now()}.jpg`, {
       type: 'image/jpeg',
       lastModified: Date.now(),
     })
 
-    setFoto(arquivo)
-    setFotoPreview(URL.createObjectURL(arquivo))
+    if (cameraDestino === 'listaEvento') {
+      await processarArquivoListaEvento(arquivo)
+    } else {
+      processarArquivoVisitante(arquivo)
+    }
+
     fecharCamera()
   }
 
   function validarEntrada() {
     setErro('')
+
+    const materiaisPreenchidos = eventoForm.materiais.filter(
+      (material) =>
+        material.quantidade.trim() ||
+        material.discriminacao.trim() ||
+        material.data.trim() ||
+        material.observacoes.trim()
+    )
 
     if (!form.nome.trim()) {
       setErro('Informe um nome valido usando apenas letras.')
@@ -513,8 +719,64 @@ export default function Porteiro() {
       return false
     }
 
-    if (form.entradaEvento && !form.eventoNome.trim()) {
+    if (!form.telefone.trim()) {
+      setErro('Telefone e obrigatorio.')
+      return false
+    }
+
+    if (!form.servico.trim()) {
+      setErro('Servico e obrigatorio.')
+      return false
+    }
+
+    if (!form.destino.trim()) {
+      setErro('Destino e obrigatorio.')
+      return false
+    }
+
+    if (!form.entradaEvento) {
+      setErro('Selecione se a entrada e para evento ou nao.')
+      return false
+    }
+
+    if (form.entradaEvento === 'sim' && !eventoForm.nome.trim()) {
       setErro('Informe o nome do evento para continuar.')
+      return false
+    }
+
+    if (form.entradaEvento === 'sim' && !eventoListaFoto && !eventoListaFotoPreview) {
+      if (!eventoForm.responsavel.trim()) {
+        setErro('Informe o responsavel do evento para continuar.')
+        return false
+      }
+
+      if (!eventoForm.fone.trim()) {
+        setErro('Informe o telefone do evento para continuar.')
+        return false
+      }
+
+      if (
+        !materiaisPreenchidos.length ||
+        !materiaisPreenchidos.some(
+          (material) => material.quantidade.trim() && material.discriminacao.trim()
+        )
+      ) {
+        setErro('Preencha ao menos um material de entrada ou anexe a foto da lista.')
+        return false
+      }
+    }
+
+    if (
+      form.entradaEvento === 'sim' &&
+      !eventoListaFoto &&
+      !eventoListaFotoPreview &&
+      materiaisPreenchidos.some(
+        (material) =>
+          material.quantidade.trim() &&
+          !material.discriminacao.trim()
+      )
+    ) {
+      setErro('Toda linha com quantidade precisa ter a discriminacao do material.')
       return false
     }
 
@@ -540,7 +802,25 @@ export default function Porteiro() {
     setSalvandoEntrada(true)
 
     try {
-      const fotoUrl = foto ? await enviarFoto(foto) : null
+      const [fotoUrl, listaEventoUrl] = await Promise.all([
+        foto ? enviarFoto(foto) : Promise.resolve(null),
+        form.entradaEvento === 'sim' && eventoListaFoto ? enviarFoto(eventoListaFoto) : Promise.resolve(null),
+      ])
+
+      const materiaisEvento = eventoForm.materiais.filter(
+        (material) =>
+          material.quantidade.trim() ||
+          material.discriminacao.trim() ||
+          material.data.trim() ||
+          material.observacoes.trim()
+      )
+      const itensEventoResumo = form.entradaEvento === 'sim'
+        ? listaEventoUrl
+          ? materiaisEvento.length
+            ? `Lista de materiais anexada por foto. ${formatarItensEvento(materiaisEvento)}`
+            : 'Lista de materiais anexada por foto.'
+          : formatarItensEvento(materiaisEvento)
+        : null
 
       if (fotoUrl) {
         await registrarLog({
@@ -559,9 +839,15 @@ export default function Porteiro() {
         servico: form.servico.trim(),
         destino: form.destino.trim(),
         responsavel: form.responsavel.trim(),
-        entrada_evento: form.entradaEvento,
-        evento_nome: form.entradaEvento ? form.eventoNome.trim() : null,
-        itens_entrada: form.entradaEvento ? form.itensEntrada.trim() : null,
+        entrada_evento: form.entradaEvento === 'sim',
+        evento_nome: form.entradaEvento === 'sim' ? eventoForm.nome.trim() : null,
+        evento_os_numero: form.entradaEvento === 'sim' ? eventoForm.osNumero.trim() : null,
+        evento_recebimento_em: form.entradaEvento === 'sim' ? eventoForm.recebimentoEm.trim() : null,
+        evento_responsavel: form.entradaEvento === 'sim' ? eventoForm.responsavel.trim() : null,
+        evento_fone: form.entradaEvento === 'sim' ? eventoForm.fone.trim() : null,
+        evento_lista_foto_url: form.entradaEvento === 'sim' ? listaEventoUrl : null,
+        evento_materiais: form.entradaEvento === 'sim' ? materiaisEvento : null,
+        itens_entrada: itensEventoResumo,
         hora_entrada: new Date().toISOString(),
         ...(fotoUrl ? { foto_url: fotoUrl } : {}),
       }
@@ -580,6 +866,7 @@ export default function Porteiro() {
       })
 
       setForm(formularioInicial)
+      resetarEvento()
       limparFoto()
       setConfirmacaoEntradaAberta(false)
       await Promise.all([carregarDentro(), carregarSaidos(buscaSaidos)])
@@ -590,14 +877,17 @@ export default function Porteiro() {
     }
   }
 
-  async function executarSaida(id: string, nome: string) {
+  async function executarSaida(registro: Registro) {
     setErro('')
-    setRegistrandoSaida(id)
+    setRegistrandoSaida(registro.id)
 
     const { error } = await supabase
       .from('registros')
-      .update({ hora_saida: new Date().toISOString() })
-      .eq('id', id)
+      .update({
+        hora_saida: new Date().toISOString(),
+        ...(registro.entrada_evento ? { evento_materiais: saidaEventoMateriais } : {}),
+      })
+      .eq('id', registro.id)
 
     setRegistrandoSaida(null)
 
@@ -608,7 +898,7 @@ export default function Porteiro() {
 
     await registrarLog({
       acao: 'saida_registrada',
-      detalhes: `Saida registrada para ${nome}.`,
+      detalhes: `Saida registrada para ${registro.nome}.`,
       usuarioEmail: usuario?.email,
       usuarioNome: usuario?.nome,
     })
@@ -628,6 +918,15 @@ export default function Porteiro() {
       servico: registro.servico || '',
       destino: registro.destino || '',
       responsavel: registro.responsavel || '',
+      entrada_evento: registro.entrada_evento ?? false,
+      evento_nome: registro.evento_nome || null,
+      evento_os_numero: registro.evento_os_numero || null,
+      evento_recebimento_em: registro.evento_recebimento_em || null,
+      evento_responsavel: registro.evento_responsavel || null,
+      evento_fone: registro.evento_fone || null,
+      evento_lista_foto_url: registro.evento_lista_foto_url || null,
+      evento_materiais: registro.evento_materiais || null,
+      itens_entrada: registro.itens_entrada || null,
       hora_entrada: new Date().toISOString(),
       ...(registro.foto_url ? { foto_url: registro.foto_url } : {}),
     }
@@ -655,13 +954,14 @@ export default function Porteiro() {
     if (!confirmacaoAcao) return
 
     if (confirmacaoAcao.tipo === 'saida') {
-      await executarSaida(confirmacaoAcao.registro.id, confirmacaoAcao.registro.nome)
+      await executarSaida(confirmacaoAcao.registro)
     }
 
     if (confirmacaoAcao.tipo === 'reentrada') {
       await executarReentrada(confirmacaoAcao.registro)
     }
 
+    setSaidaEventoMateriais([])
     setConfirmacaoAcao(null)
   }
 
@@ -715,6 +1015,12 @@ export default function Porteiro() {
     setConsultaPesquisa('')
     setConsultaFiltro('todos')
     setConsultaRegistros([])
+  }
+
+  function toggleRegistroExpandido(id: string) {
+    setRegistrosExpandidos((atual) =>
+      atual.includes(id) ? atual.filter((item) => item !== id) : [...atual, id]
+    )
   }
 
   function handleLogout() {
@@ -839,13 +1145,14 @@ export default function Porteiro() {
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Telefone</span>
+                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Telefone *</span>
                 <input
                   value={form.telefone}
                   onChange={(event) => alterarCampo('telefone', event.target.value)}
                   className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
                   inputMode="numeric"
                   pattern="[0-9]*"
+                  required
                 />
               </label>
 
@@ -859,20 +1166,22 @@ export default function Porteiro() {
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Servico</span>
+                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Servico *</span>
                 <input
                   value={form.servico}
                   onChange={(event) => alterarCampo('servico', event.target.value)}
                   className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                  required
                 />
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Destino</span>
+                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Destino *</span>
                 <input
                   value={form.destino}
                   onChange={(event) => alterarCampo('destino', event.target.value)}
                   className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                  required
                 />
               </label>
 
@@ -889,14 +1198,22 @@ export default function Porteiro() {
 
               <div className="block">
                 <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-                  Entrada para evento?
+                  Entrada para evento? *
                 </span>
                 <div className="inline-flex rounded-lg border border-[#e5d4dc] bg-white p-1 shadow-sm">
                   <button
                     type="button"
-                    onClick={() => setForm((atual) => ({ ...atual, entradaEvento: false, eventoNome: '', itensEntrada: '' }))}
+                    onClick={() => {
+                      setForm((atual) => ({
+                        ...atual,
+                        entradaEvento: 'nao',
+                        eventoNome: '',
+                        itensEntrada: '',
+                      }))
+                      resetarEvento()
+                    }}
                     className={`rounded-md px-4 py-2 text-sm font-bold transition ${
-                      !form.entradaEvento
+                      form.entradaEvento === 'nao'
                         ? 'bg-[#97003f] text-white'
                         : 'text-[#6f4358] hover:bg-[#fff0f6]'
                     }`}
@@ -905,9 +1222,18 @@ export default function Porteiro() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setForm((atual) => ({ ...atual, entradaEvento: true }))}
+                    onClick={() => {
+                      setForm((atual) => ({ ...atual, entradaEvento: 'sim' }))
+                      setEventoForm((atual) => ({
+                        ...atual,
+                        nome: atual.nome || form.destino,
+                        responsavel: atual.responsavel || form.responsavel,
+                        fone: atual.fone || form.telefone,
+                      }))
+                      setEventoModalAberto(true)
+                    }}
                     className={`rounded-md px-4 py-2 text-sm font-bold transition ${
-                      form.entradaEvento
+                      form.entradaEvento === 'sim'
                         ? 'bg-[#97003f] text-white'
                         : 'text-[#6f4358] hover:bg-[#fff0f6]'
                     }`}
@@ -917,35 +1243,40 @@ export default function Porteiro() {
                 </div>
               </div>
 
-              {form.entradaEvento && (
-                <>
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-                      Nome do evento
-                    </span>
-                    <input
-                      value={form.eventoNome}
-                      onChange={(event) =>
-                        setForm((atual) => ({ ...atual, eventoNome: event.target.value }))
-                      }
-                      className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                    />
-                  </label>
+              {form.entradaEvento === 'sim' && (
+                <div className="sm:col-span-2 rounded-lg border border-[#eadde3] bg-[#fffafb] p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-[#4a2636]">Controle de materiais do evento</p>
+                      <p className="mt-1 text-sm text-[#6f4358]">
+                        Abra a ficha do evento para preencher os materiais ou anexar a foto da folha ja preenchida.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEventoModalAberto(true)}
+                      className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                    >
+                      Abrir ficha do evento
+                    </button>
+                  </div>
 
-                  <label className="block sm:col-span-2">
-                    <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-                      Descricao de entrada de itens
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                    <span className="rounded-full bg-white px-3 py-1 text-[#8a2d55]">
+                      Evento: {texto(eventoForm.nome)}
                     </span>
-                    <textarea
-                      value={form.itensEntrada}
-                      onChange={(event) =>
-                        setForm((atual) => ({ ...atual, itensEntrada: event.target.value }))
+                    <span className="rounded-full bg-white px-3 py-1 text-[#8a2d55]">
+                      Lista por foto: {eventoListaFotoPreview ? 'Sim' : 'Nao'}
+                    </span>
+                    <span className="rounded-full bg-white px-3 py-1 text-[#8a2d55]">
+                      Materiais digitados: {
+                        eventoForm.materiais.filter(
+                          (material) => material.quantidade.trim() || material.discriminacao.trim()
+                        ).length
                       }
-                      rows={3}
-                      className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                    />
-                  </label>
-                </>
+                    </span>
+                  </div>
+                </div>
               )}
 
               <div className="sm:col-span-2">
@@ -989,7 +1320,7 @@ export default function Porteiro() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={abrirCamera}
+                        onClick={() => abrirCamera('visitante')}
                         disabled={carregandoCamera}
                         className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
                       >
@@ -1108,14 +1439,49 @@ export default function Porteiro() {
                     <p className="mt-1 text-xs font-semibold text-[#8a2d55]">
                       Entrada: {formatarData(registro.hora_entrada)}
                     </p>
+                    {registro.entrada_evento && (
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleRegistroExpandido(registro.id)}
+                          className="rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                        >
+                          {registrosExpandidos.includes(registro.id) ? '-' : '+'}
+                        </button>
+                      </div>
+                    )}
+                    {registro.entrada_evento && registrosExpandidos.includes(registro.id) && (
+                      <div className="mt-2 rounded-md bg-[#fffafb] p-3 text-xs text-[#6f4358]">
+                        <p><strong>Evento:</strong> {texto(registro.evento_nome)}</p>
+                        <p className="mt-1"><strong>OS numero:</strong> {texto(registro.evento_os_numero)}</p>
+                        <p className="mt-1"><strong>Recebimento em:</strong> {texto(registro.evento_recebimento_em)}</p>
+                        <p className="mt-1"><strong>Responsavel:</strong> {texto(registro.evento_responsavel)}</p>
+                        <p className="mt-1"><strong>Fone:</strong> {texto(registro.evento_fone)}</p>
+                        <p className="mt-1"><strong>Itens:</strong> {texto(registro.itens_entrada)}</p>
+                        {registro.evento_lista_foto_url && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setImagemAberta({
+                                alt: `Lista de materiais de ${registro.nome}`,
+                                src: registro.evento_lista_foto_url || '',
+                              })
+                            }
+                            className="mt-2 rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                          >
+                            Ver lista anexada
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setConfirmacaoAcao({ tipo: 'saida', registro })}
-                    disabled={registrandoSaida === registro.id}
-                    className="rounded-md bg-[#97003f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
-                  >
+                    <button
+                      type="button"
+                      onClick={() => abrirConfirmacaoSaida(registro)}
+                      disabled={registrandoSaida === registro.id}
+                      className="rounded-md bg-[#97003f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
+                    >
                     {registrandoSaida === registro.id ? 'Salvando...' : 'Registrar saida'}
                   </button>
                 </div>
@@ -1285,9 +1651,44 @@ export default function Porteiro() {
                       <p className="mt-1 break-words text-sm text-[#6f4358]">
                         {texto(registro.empresa)} · {texto(registro.servico)} · {texto(registro.destino)}
                       </p>
+                      {registro.entrada_evento && (
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleRegistroExpandido(registro.id)}
+                            className="rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                          >
+                            {registrosExpandidos.includes(registro.id) ? '-' : '+'}
+                          </button>
+                        </div>
+                      )}
                       <p className="mt-1 text-xs font-semibold text-[#8a2d55]">
                         Entrada: {formatarData(registro.hora_entrada)}
                       </p>
+                      {registro.entrada_evento && registrosExpandidos.includes(registro.id) && (
+                        <div className="mt-2 rounded-md bg-[#fffafb] p-3 text-xs text-[#6f4358]">
+                          <p><strong>Evento:</strong> {texto(registro.evento_nome)}</p>
+                          <p className="mt-1"><strong>OS numero:</strong> {texto(registro.evento_os_numero)}</p>
+                          <p className="mt-1"><strong>Recebimento em:</strong> {texto(registro.evento_recebimento_em)}</p>
+                          <p className="mt-1"><strong>Responsavel:</strong> {texto(registro.evento_responsavel)}</p>
+                          <p className="mt-1"><strong>Fone:</strong> {texto(registro.evento_fone)}</p>
+                          <p className="mt-1"><strong>Itens:</strong> {texto(registro.itens_entrada)}</p>
+                          {registro.evento_lista_foto_url && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setImagemAberta({
+                                  alt: `Lista de materiais de ${registro.nome}`,
+                                  src: registro.evento_lista_foto_url || '',
+                                })
+                              }
+                              className="mt-2 rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                            >
+                              Ver lista anexada
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1362,9 +1763,9 @@ export default function Porteiro() {
                 <div className="flex flex-wrap gap-2">
                 {[
                   { id: 'todos', label: 'Todos' },
-                  { id: 'dentro', label: 'So dentro' },
-                  { id: 'reentrada', label: 'So reentrada' },
-                  { id: 'saida', label: 'So saida' },
+                  { id: 'dentro', label: 'Dentro' },
+                  { id: 'reentrada', label: 'Reentrada' },
+                  { id: 'saida', label: 'Saida' },
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -1405,6 +1806,7 @@ export default function Porteiro() {
                     <th className="px-4 py-3">Empresa</th>
                     <th className="px-4 py-3">Servico</th>
                     <th className="px-4 py-3">Destino</th>
+                    <th className="px-4 py-3">Evento / Itens</th>
                     <th className="px-4 py-3">Entrada</th>
                     <th className="px-4 py-3">Saida</th>
                     <th className="px-4 py-3">Situacao</th>
@@ -1413,7 +1815,7 @@ export default function Porteiro() {
                 <tbody className="divide-y divide-[#f3e8ed]">
                   {!consultaExecutada && !consultaDataInicio && !consultaDataFim && !consultaPesquisa.trim() && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-[#8a2d55]">
+                      <td colSpan={10} className="px-4 py-8 text-center text-[#8a2d55]">
                         Preencha uma data ou pesquisa para carregar os registros.
                       </td>
                     </tr>
@@ -1421,7 +1823,7 @@ export default function Porteiro() {
 
                   {consultaExecutada && consultaRegistrosFiltrados.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-[#8a2d55]">
+                      <td colSpan={10} className="px-4 py-8 text-center text-[#8a2d55]">
                         Nenhum registro encontrado para o filtro selecionado.
                       </td>
                     </tr>
@@ -1468,6 +1870,16 @@ export default function Porteiro() {
                         <td className="px-4 py-3 text-[#6f4358]">{texto(registro.empresa)}</td>
                         <td className="px-4 py-3 text-[#6f4358]">{texto(registro.servico)}</td>
                         <td className="px-4 py-3 text-[#6f4358]">{texto(registro.destino)}</td>
+                        <td className="px-4 py-3 text-[#6f4358]">
+                          {registro.entrada_evento ? (
+                            <div className="space-y-1">
+                              <p className="font-semibold text-[#4a2636]">{texto(registro.evento_nome)}</p>
+                              <p className="text-xs leading-5">{texto(registro.itens_entrada)}</p>
+                            </div>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-[#6f4358]">{formatarData(registro.hora_entrada)}</td>
                         <td className="px-4 py-3 text-[#6f4358]">
                           {registro.hora_saida ? formatarData(registro.hora_saida) : '-'}
@@ -1486,9 +1898,264 @@ export default function Porteiro() {
         </section>
       </div>
 
+      {eventoModalAberto && form.entradaEvento === 'sim' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2b1420]/70 p-4">
+          <div className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-xl border border-[#eadde3] bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-[#f0e3e8] px-5 py-4">
+              <div>
+                <h2 className="text-lg font-bold text-[#2b1420]">Controle de entrada e saida de materiais</h2>
+                <p className="mt-1 text-sm text-[#6f4358]">
+                  Preencha a ficha do evento ou anexe a foto da folha ja preenchida.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEventoModalAberto(false)}
+                className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="max-h-[calc(92vh-84px)] overflow-y-auto px-5 py-5">
+              <div className="rounded-lg border border-[#eadde3] bg-[#fffafb] p-4 text-sm text-[#6f4358]">
+                Se a empresa ja trouxe a folha preenchida, basta anexar a foto da lista. Sem a foto, o preenchimento digital da ficha passa a ser obrigatorio.
+              </div>
+
+              <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.45fr)_340px]">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <label className="block md:col-span-2">
+                      <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Evento *</span>
+                      <input
+                        value={eventoForm.nome}
+                        onChange={(event) => alterarCampoEvento('nome', event.target.value)}
+                        className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-[#4a2636]">OS numero</span>
+                      <input
+                        value={eventoForm.osNumero}
+                        onChange={(event) => alterarCampoEvento('osNumero', event.target.value)}
+                        className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Recebimento em</span>
+                      <input
+                        value={eventoForm.recebimentoEm}
+                        onChange={(event) => alterarCampoEvento('recebimentoEm', event.target.value)}
+                        className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                      />
+                    </label>
+
+                    <label className="block md:col-span-1">
+                      <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Responsavel *</span>
+                      <input
+                        value={eventoForm.responsavel}
+                        onChange={(event) => alterarCampoEvento('responsavel', event.target.value)}
+                        className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                      />
+                    </label>
+
+                    <label className="block md:col-span-1">
+                      <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Fone *</span>
+                      <input
+                        value={eventoForm.fone}
+                        onChange={(event) => alterarCampoEvento('fone', event.target.value)}
+                        inputMode="numeric"
+                        className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="rounded-lg border border-[#eadde3]">
+                    <div className="border-b border-[#f0e3e8] px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-sm font-bold text-[#2b1420]">Entrada de material</h3>
+                          <p className="mt-1 text-xs text-[#6f4358]">
+                            Preencha esta grade quando a empresa nao trouxer a lista pronta.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={adicionarMaterialEvento}
+                          className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                        >
+                          Adicionar linha
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[980px] text-left text-sm">
+                        <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
+                          <tr>
+                            <th className="px-3 py-3">Qtde</th>
+                            <th className="px-3 py-3">Discriminacao</th>
+                            <th className="px-3 py-3">Data</th>
+                            <th className="px-3 py-3">Observacoes</th>
+                            <th className="px-3 py-3"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#f3e8ed]">
+                          {eventoForm.materiais.map((material) => (
+                            <tr key={material.id}>
+                              <td className="px-3 py-3">
+                                <input
+                                  value={material.quantidade}
+                                  onChange={(event) =>
+                                    alterarMaterialEvento(material.id, 'quantidade', event.target.value)
+                                  }
+                                  className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                                />
+                              </td>
+                              <td className="px-3 py-3">
+                                <input
+                                  value={material.discriminacao}
+                                  onChange={(event) =>
+                                    alterarMaterialEvento(material.id, 'discriminacao', event.target.value)
+                                  }
+                                  className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                                />
+                              </td>
+                              <td className="px-3 py-3">
+                                <input
+                                  type="date"
+                                  value={material.data}
+                                  onChange={(event) =>
+                                    alterarMaterialEvento(material.id, 'data', event.target.value)
+                                  }
+                                  className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                                />
+                              </td>
+                              <td className="px-3 py-3">
+                                <input
+                                  value={material.observacoes}
+                                  onChange={(event) =>
+                                    alterarMaterialEvento(material.id, 'observacoes', event.target.value)
+                                  }
+                                  className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                                />
+                              </td>
+                              <td className="px-3 py-3">
+                                <button
+                                  type="button"
+                                  onClick={() => removerMaterialEvento(material.id)}
+                                  className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                                >
+                                  Remover
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-[#eadde3] bg-[#fffafb] p-4">
+                  <h3 className="text-sm font-bold text-[#2b1420]">Foto da lista preenchida</h3>
+                  <p className="mt-1 text-sm text-[#6f4358]">
+                    Se a empresa ja chegar com a folha pronta, anexe a imagem aqui e voce nao precisa digitar os materiais.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      eventoListaFotoPreview
+                        ? setImagemAberta({
+                            alt: 'Lista de materiais anexada',
+                            src: eventoListaFotoPreview,
+                          })
+                        : undefined
+                    }
+                    className="mt-4 grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-md border border-[#eadde3] bg-white"
+                  >
+                    {eventoListaFotoPreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={eventoListaFotoPreview}
+                        alt="Previa da lista do evento"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="px-4 text-center text-sm font-semibold text-[#8a2d55]">
+                        Nenhuma lista anexada
+                      </span>
+                    )}
+                  </button>
+
+                  <div className="mt-4 space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => eventoListaInputRef.current?.click()}
+                        className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                      >
+                        Anexar imagem
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => abrirCamera('listaEvento')}
+                        disabled={carregandoCamera}
+                        className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
+                      >
+                        {carregandoCamera && cameraDestino === 'listaEvento' ? 'Abrindo camera...' : 'Usar camera'}
+                      </button>
+                    </div>
+                    <input
+                      ref={eventoListaInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={alterarListaEvento}
+                      className="hidden"
+                    />
+                    <p className="text-xs text-[#8a2d55]">
+                      Escolha se vai anexar a foto da folha ou capturar direto pela webcam. A imagem tambem sera reduzida antes do envio.
+                    </p>
+                    {eventoListaFotoPreview && (
+                      <button
+                        type="button"
+                        onClick={limparListaEvento}
+                        className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                      >
+                        Remover foto da lista
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEventoModalAberto(false)}
+                  className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                >
+                  Fechar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEventoModalAberto(false)}
+                  className="rounded-md bg-[#97003f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#7b0034]"
+                >
+                  Salvar ficha do evento
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmacaoEntradaAberta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2b1420]/70 p-4">
-          <div className="w-full max-w-lg rounded-xl border border-[#eadde3] bg-white p-5 shadow-xl">
+          <div className="w-full max-w-4xl rounded-xl border border-[#eadde3] bg-white p-5 shadow-xl">
             <h2 className="text-lg font-bold text-[#2b1420]">Confirmar entrada</h2>
             <p className="mt-2 text-sm text-[#6f4358]">
               Confira os dados antes de registrar a entrada do visitante.
@@ -1497,13 +2164,32 @@ export default function Porteiro() {
             <div className="mt-4 rounded-lg bg-[#fffafb] p-4 text-sm text-[#4a2636]">
               <p><strong>Nome:</strong> {form.nome || '-'}</p>
               <p className="mt-2"><strong>Documento:</strong> {form.documento || '-'}</p>
+              <p className="mt-2"><strong>Telefone:</strong> {form.telefone || '-'}</p>
+              <p className="mt-2"><strong>Servico:</strong> {form.servico || '-'}</p>
               <p className="mt-2"><strong>Destino:</strong> {form.destino || '-'}</p>
               <p className="mt-2"><strong>Responsavel:</strong> {form.responsavel || '-'}</p>
-              <p className="mt-2"><strong>Entrada para evento:</strong> {form.entradaEvento ? 'Sim' : 'Nao'}</p>
-              {form.entradaEvento && (
+              <p className="mt-2">
+                <strong>Entrada para evento:</strong>{' '}
+                {form.entradaEvento === 'sim'
+                  ? 'Sim'
+                  : form.entradaEvento === 'nao'
+                    ? 'Nao'
+                    : '-'}
+              </p>
+              {form.entradaEvento === 'sim' && (
                 <>
-                  <p className="mt-2"><strong>Nome do evento:</strong> {form.eventoNome || '-'}</p>
-                  <p className="mt-2"><strong>Itens de entrada:</strong> {form.itensEntrada || '-'}</p>
+                  <p className="mt-2"><strong>Nome do evento:</strong> {eventoForm.nome || '-'}</p>
+                  <p className="mt-2"><strong>OS numero:</strong> {eventoForm.osNumero || '-'}</p>
+                  <p className="mt-2"><strong>Recebimento em:</strong> {eventoForm.recebimentoEm || '-'}</p>
+                  <p className="mt-2"><strong>Responsavel do evento:</strong> {eventoForm.responsavel || '-'}</p>
+                  <p className="mt-2"><strong>Fone do evento:</strong> {eventoForm.fone || '-'}</p>
+                  <p className="mt-2">
+                    <strong>Lista por foto:</strong> {eventoListaFotoPreview ? 'Anexada' : 'Nao anexada'}
+                  </p>
+                  <p className="mt-2">
+                    <strong>Itens de entrada:</strong>{' '}
+                    {formatarItensEvento(eventoForm.materiais) || 'Nao informado'}
+                  </p>
                 </>
               )}
             </div>
@@ -1552,10 +2238,65 @@ export default function Porteiro() {
               )}
             </div>
 
+            {confirmacaoAcao.tipo === 'saida' && confirmacaoAcao.registro.entrada_evento && (
+              <div className="mt-4 rounded-lg border border-[#eadde3]">
+                <div className="border-b border-[#f0e3e8] px-4 py-3">
+                  <h3 className="text-sm font-bold text-[#2b1420]">Saida de material</h3>
+                  <p className="mt-1 text-xs text-[#6f4358]">
+                    A entrada fica bloqueada. Informe apenas a quantidade que esta saindo agora.
+                  </p>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-left text-sm">
+                    <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
+                      <tr>
+                        <th className="px-3 py-3">Qtde entrada</th>
+                        <th className="px-3 py-3">Discriminacao</th>
+                        <th className="px-3 py-3">Data</th>
+                        <th className="px-3 py-3">Observacoes</th>
+                        <th className="px-3 py-3">Qtde saida</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#f3e8ed]">
+                      {saidaEventoMateriais.length ? (
+                        saidaEventoMateriais.map((material) => (
+                          <tr key={`saida-material-${material.id}`}>
+                            <td className="px-3 py-3 font-semibold text-[#4a2636]">{texto(material.quantidade)}</td>
+                            <td className="px-3 py-3 text-[#6f4358]">{texto(material.discriminacao)}</td>
+                            <td className="px-3 py-3 text-[#6f4358]">
+                              {material.data ? new Intl.DateTimeFormat('pt-BR').format(new Date(`${material.data}T00:00:00`)) : '-'}
+                            </td>
+                            <td className="px-3 py-3 text-[#6f4358]">{texto(material.observacoes)}</td>
+                            <td className="px-3 py-3">
+                              <input
+                                value={material.quantidadeSaida}
+                                onChange={(event) => alterarSaidaMaterial(material.id, event.target.value)}
+                                className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                              />
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-6 text-center text-[#8a2d55]">
+                            Este evento nao possui materiais digitados na entrada.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setConfirmacaoAcao(null)}
+                onClick={() => {
+                  setSaidaEventoMateriais([])
+                  setConfirmacaoAcao(null)
+                }}
                 className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
               >
                 Cancelar

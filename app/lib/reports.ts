@@ -4,10 +4,13 @@ import * as XLSX from 'xlsx'
 type RegistroRelatorio = {
   destino?: string | null
   documento?: string | null
+  entrada_evento?: boolean | null
   empresa?: string | null
+  evento_nome?: string | null
   foto_url?: string | null
   hora_entrada?: string | null
   hora_saida?: string | null
+  itens_entrada?: string | null
   nome: string
   responsavel?: string | null
   servico?: string | null
@@ -96,6 +99,8 @@ export function exportarRelatorioExcel(registros: RegistroRelatorio[]) {
     Empresa: limparTexto(registro.empresa),
     Servico: limparTexto(registro.servico),
     Destino: limparTexto(registro.destino),
+    Evento: registro.entrada_evento ? limparTexto(registro.evento_nome) : '',
+    Itens: registro.entrada_evento ? limparTexto(registro.itens_entrada) : '',
     Responsavel: limparTexto(registro.responsavel),
     Entrada: formatarData(registro.hora_entrada),
     Saida: formatarData(registro.hora_saida),
@@ -110,6 +115,8 @@ export function exportarRelatorioExcel(registros: RegistroRelatorio[]) {
     { wch: 22 },
     { wch: 20 },
     { wch: 20 },
+    { wch: 24 },
+    { wch: 42 },
     { wch: 24 },
     { wch: 22 },
     { wch: 22 },
@@ -157,6 +164,8 @@ export async function exportarRelatorioPdf(registros: RegistroRelatorio[]) {
       ['Empresa', limparTexto(registro.empresa) || '-'],
       ['Servico', limparTexto(registro.servico) || '-'],
       ['Destino', limparTexto(registro.destino) || '-'],
+      ['Evento', registro.entrada_evento ? limparTexto(registro.evento_nome) || '-' : 'Nao'],
+      ['Itens', registro.entrada_evento ? limparTexto(registro.itens_entrada) || '-' : '-'],
       ['Responsavel', limparTexto(registro.responsavel) || '-'],
       ['Entrada', formatarData(registro.hora_entrada)],
       ['Saida', formatarData(registro.hora_saida)],
