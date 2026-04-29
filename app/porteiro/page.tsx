@@ -263,6 +263,7 @@ export default function Porteiro() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const eventoListaInputRef = useRef<HTMLInputElement | null>(null)
+  const acoesEntradaRef = useRef<HTMLDivElement | null>(null)
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [dentro, setDentro] = useState<Registro[]>([])
   const [form, setForm] = useState<FormularioEntrada>(formularioInicial)
@@ -476,6 +477,27 @@ export default function Porteiro() {
 
     return `${total} ${sufixo} ${filtro}.`
   }, [consultaExecutada, consultaFiltro, consultaRegistrosFiltrados])
+
+  const erroFormularioEntrada = useMemo(() => {
+    if (!erro) return ''
+
+    const mensagensFormulario = [
+      'Informe um nome valido',
+      'CPF obrigatorio',
+      'Telefone obrigatorio',
+      'Servico e obrigatorio',
+      'Destino e obrigatorio',
+      'Selecione se a entrada e para evento',
+      'Informe o nome do evento',
+      'Informe o responsavel do evento',
+      'Informe o telefone do evento',
+      'Preencha ao menos um material',
+      'Toda linha com quantidade precisa',
+      'Descreva os itens vinculados ao evento',
+    ]
+
+    return mensagensFormulario.some((mensagem) => erro.startsWith(mensagem)) ? erro : ''
+  }, [erro])
 
   const registrosSelecionadosParaExportacao = useMemo(() => {
     const selecionados = consultaRegistrosFiltrados.filter((registro) =>
@@ -817,6 +839,7 @@ export default function Porteiro() {
     event.preventDefault()
 
     if (!validarEntrada()) {
+      acoesEntradaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
 
@@ -1152,7 +1175,7 @@ export default function Porteiro() {
           </div>
         </header>
 
-        {erro && (
+        {erro && !erroFormularioEntrada && (
           <div className="mb-5 rounded-md border border-[#f3b7cc] bg-[#fff0f6] px-4 py-3 text-sm font-medium text-[#97003f]">
             {erro}
           </div>
@@ -1415,24 +1438,33 @@ export default function Porteiro() {
               <div className="hidden" aria-hidden="true" />
             )}
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              <button
-                type="submit"
-                disabled={salvandoEntrada}
-                className="rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
-              >
-                {salvandoEntrada ? 'Registrando...' : 'Registrar entrada'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setForm(formularioInicial)
-                  limparFoto()
-                }}
-                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-3 font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-              >
-                Cancelar
-              </button>
+            <div ref={acoesEntradaRef} className="mt-5">
+              {erroFormularioEntrada && (
+                <div className="mb-3 rounded-md border border-[#f3b7cc] bg-[#fff0f6] px-4 py-3 text-sm font-medium text-[#97003f]">
+                  {erroFormularioEntrada}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  disabled={salvandoEntrada}
+                  className="rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
+                >
+                  {salvandoEntrada ? 'Registrando...' : 'Registrar entrada'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm(formularioInicial)
+                    limparFoto()
+                    setErro('')
+                  }}
+                  className="rounded-md border border-[#d7b8c7] bg-white px-4 py-3 font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           </form>
 
