@@ -37,6 +37,8 @@ type ConfirmacaoAcao =
   | { tipo: 'saida'; registro: Registro }
   | { tipo: 'reentrada'; registro: Registro }
 
+type FiltroConsulta = 'todos' | 'dentro' | 'reentrada' | 'saida'
+
 type FormularioEntrada = {
   nome: string
   documento: string
@@ -59,7 +61,31 @@ const formularioInicial: FormularioEntrada = {
 
 const BUCKET_FOTOS = 'registros-fotos'
 const TAMANHO_MAXIMO_FOTO = 5 * 1024 * 1024
-const LIMITE_VISUAL_DENTRO = 3
+function chaveRegistro(registro: Registro) {
+  return `${(registro.documento || '').trim().toLowerCase()}::${registro.nome.trim().toLowerCase()}`
+}
+
+function identificarReentradas(registros: Registro[]) {
+  const chavesReentrada = new Set<string>()
+  const historico = [...registros].sort(
+    (a, b) => new Date(a.hora_entrada).getTime() - new Date(b.hora_entrada).getTime()
+  )
+  const jaSaiuPorPessoa = new Set<string>()
+
+  historico.forEach((registro) => {
+    const chave = chaveRegistro(registro)
+
+    if (jaSaiuPorPessoa.has(chave)) {
+      chavesReentrada.add(registro.id)
+    }
+
+    if (registro.hora_saida) {
+      jaSaiuPorPessoa.add(chave)
+    }
+  })
+
+  return chavesReentrada
+}
 
 function formatarData(valor: string) {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -126,8 +152,14 @@ export default function Porteiro() {
   const [fotoPreview, setFotoPreview] = useState('')
   const [imagemAberta, setImagemAberta] = useState<{ alt: string; src: string } | null>(null)
   const [buscaDentro, setBuscaDentro] = useState('')
+  const [buscaHospedesDentro, setBuscaHospedesDentro] = useState('')
   const [buscaSaidos, setBuscaSaidos] = useState('')
   const [saidos, setSaidos] = useState<Registro[]>([])
+  const [consultaRegistros, setConsultaRegistros] = useState<Registro[]>([])
+  const [consultaDataInicio, setConsultaDataInicio] = useState('')
+  const [consultaDataFim, setConsultaDataFim] = useState('')
+  const [consultaPesquisa, setConsultaPesquisa] = useState('')
+  const [consultaFiltro, setConsultaFiltro] = useState<FiltroConsulta>('todos')
   const [cameraAberta, setCameraAberta] = useState(false)
   const [confirmacaoEntradaAberta, setConfirmacaoEntradaAberta] = useState(false)
   const [confirmacaoAcao, setConfirmacaoAcao] = useState<ConfirmacaoAcao | null>(null)
@@ -209,10 +241,12 @@ export default function Porteiro() {
     return formatarData(dentro[0].hora_entrada)
   }, [dentro])
 
+  const idsReentrada = useMemo(() => identificarReentradas([...dentro, ...saidos]), [dentro, saidos])
+
   const dentroFiltrado = useMemo(() => {
     const termo = buscaDentro.trim().toLowerCase()
 
-    if (!termo) return dentro
+    if (!termo) return []
 
     return dentro.filter((registro) => {
       const nome = registro.nome.toLowerCase()
@@ -221,18 +255,24 @@ export default function Porteiro() {
     })
   }, [buscaDentro, dentro])
 
-  const dentroVisivel = useMemo(() => {
-    if (buscaDentro.trim()) {
-      return dentroFiltrado
-    }
+  const dentroVisivel = useMemo(() => dentroFiltrado, [dentroFiltrado])
 
-    return dentroFiltrado.slice(0, LIMITE_VISUAL_DENTRO)
-  }, [buscaDentro, dentroFiltrado])
+  const hospedesDentroFiltrados = useMemo(() => {
+    const termo = buscaHospedesDentro.trim().toLowerCase()
+
+    if (!termo) return []
+
+    return dentro.filter((registro) => {
+      const nome = registro.nome.toLowerCase()
+      const documento = (registro.documento || '').toLowerCase()
+      return nome.includes(termo) || documento.includes(termo)
+    })
+  }, [buscaHospedesDentro, dentro])
 
   const saidosFiltrados = useMemo(() => {
     const termo = buscaSaidos.trim().toLowerCase()
 
-    if (!termo) return saidos
+    if (!termo) return []
 
     return saidos.filter((registro) => {
       const nome = registro.nome.toLowerCase()
@@ -240,6 +280,24 @@ export default function Porteiro() {
       return nome.includes(termo) || documento.includes(termo)
     })
   }, [buscaSaidos, saidos])
+
+  const consultaRegistrosFiltrados = useMemo(() => {
+    if (!consultaRegistros.length) return []
+
+    if (consultaFiltro === 'todos') {
+      return consultaRegistros
+    }
+
+    if (consultaFiltro === 'dentro') {
+      return consultaRegistros.filter((registro) => !registro.hora_saida)
+    }
+
+    if (consultaFiltro === 'saida') {
+      return consultaRegistros.filter((registro) => Boolean(registro.hora_saida))
+    }
+
+    return consultaRegistros.filter((registro) => idsReentrada.has(registro.id))
+  }, [consultaFiltro, consultaRegistros, idsReentrada])
 
   function alterarCampo(campo: keyof FormularioEntrada, valor: string) {
     const proximoValor =
@@ -535,6 +593,48 @@ export default function Porteiro() {
     setCarregando(false)
   }
 
+  async function consultarRegistros(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault()
+    setErro('')
+
+    if (!consultaDataInicio && !consultaDataFim && !consultaPesquisa.trim()) {
+      setConsultaRegistros([])
+      return
+    }
+
+    let query = supabase.from('registros').select('*').order('hora_entrada', { ascending: false })
+
+    if (consultaDataInicio) {
+      query = query.gte('hora_entrada', `${consultaDataInicio}T00:00:00`)
+    }
+
+    if (consultaDataFim) {
+      query = query.lte('hora_entrada', `${consultaDataFim}T23:59:59`)
+    }
+
+    if (consultaPesquisa.trim()) {
+      const termo = consultaPesquisa.trim()
+      query = query.or(`nome.ilike.%${termo}%,documento.ilike.%${termo}%`)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      setErro('Nao foi possivel consultar os registros.')
+      return
+    }
+
+    setConsultaRegistros((data || []) as Registro[])
+  }
+
+  function limparConsulta() {
+    setConsultaDataInicio('')
+    setConsultaDataFim('')
+    setConsultaPesquisa('')
+    setConsultaFiltro('todos')
+    setConsultaRegistros([])
+  }
+
   function handleLogout() {
     limparSessaoUsuario()
     router.push('/')
@@ -811,14 +911,15 @@ export default function Porteiro() {
                 </div>
               </div>
 
-              <div className="divide-y divide-[#f3e8ed]">
-              {dentroFiltrado.length === 0 && (
-                <p className="px-4 py-8 text-center text-sm text-[#8a2d55]">
-                  Nenhum visitante encontrado.
-                </p>
-              )}
+              {buscaDentro.trim() ? (
+                <div className="divide-y divide-[#f3e8ed]">
+                {dentroFiltrado.length === 0 && (
+                  <p className="px-4 py-8 text-center text-sm text-[#8a2d55]">
+                    Nenhum visitante encontrado.
+                  </p>
+                )}
 
-              {dentroVisivel.map((registro) => (
+                {dentroVisivel.map((registro) => (
                 <div
                   key={registro.id}
                   className="grid gap-4 px-4 py-4 sm:grid-cols-[56px_1fr_auto] sm:items-center"
@@ -875,21 +976,16 @@ export default function Porteiro() {
                     {registrandoSaida === registro.id ? 'Salvando...' : 'Registrar saida'}
                   </button>
                 </div>
-              ))}
-
-              {!buscaDentro.trim() && dentroFiltrado.length > LIMITE_VISUAL_DENTRO && (
-                <div className="px-4 py-4 text-sm text-[#8a2d55]">
-                  Mostrando os 3 mais recentes. Use a pesquisa para localizar outros visitantes ainda dentro.
+                ))}
                 </div>
-              )}
-            </div>
+              ) : null}
             </div>
 
             <div className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
               <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <h2 className="text-lg font-bold">Reentrada</h2>
+                    <h2 className="text-lg font-bold">Registrar Reentrada</h2>
                     <p className="mt-1 text-sm text-[#6f4358]">
                       Consulte quem ja saiu e registre o retorno sem preencher tudo de novo.
                     </p>
@@ -907,7 +1003,8 @@ export default function Porteiro() {
                 </div>
               </div>
 
-              <div className="divide-y divide-[#f3e8ed]">
+              {buscaSaidos.trim() ? (
+                <div className="divide-y divide-[#f3e8ed]">
                 {saidosFiltrados.length === 0 && (
                   <p className="px-4 py-8 text-center text-sm text-[#8a2d55]">
                     Nenhum visitante com saida registrada foi encontrado.
@@ -972,9 +1069,271 @@ export default function Porteiro() {
                     </button>
                   </div>
                 ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
+              <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold">Pessoas dentro do hotel</h2>
+                    <p className="mt-1 text-sm text-[#6f4358]">
+                      Consulta rapida por nome ou documento dos visitantes que ainda estao dentro.
+                    </p>
+                  </div>
+                  <input
+                    value={buscaHospedesDentro}
+                    onChange={(event) => setBuscaHospedesDentro(event.target.value)}
+                    placeholder="Pesquisar nome ou documento"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs"
+                  />
+                </div>
               </div>
+
+              {buscaHospedesDentro.trim() ? (
+                <div className="divide-y divide-[#f3e8ed]">
+                {hospedesDentroFiltrados.length === 0 && (
+                  <p className="px-4 py-8 text-center text-sm text-[#8a2d55]">
+                    Nenhum visitante encontrado.
+                  </p>
+                )}
+
+                {hospedesDentroFiltrados.map((registro) => (
+                  <div
+                    key={`hospede-${registro.id}`}
+                    className="grid gap-4 px-4 py-4 sm:grid-cols-[56px_1fr] sm:items-center"
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        registro.foto_url
+                          ? setImagemAberta({
+                              alt: `Foto de ${registro.nome}`,
+                              src: registro.foto_url,
+                            })
+                          : undefined
+                      }
+                      className="size-14 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
+                    >
+                      {registro.foto_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={registro.foto_url}
+                          alt={`Foto de ${registro.nome}`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="grid h-full place-items-center text-sm font-black text-[#97003f]">
+                          {registro.nome?.charAt(0).toUpperCase() || '?'}
+                        </div>
+                      )}
+                    </button>
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="break-words font-bold">{registro.nome}</p>
+                        {registro.documento && (
+                          <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55]">
+                            {registro.documento}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 break-words text-sm text-[#6f4358]">
+                        {texto(registro.empresa)} · {texto(registro.servico)} · {texto(registro.destino)}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-[#8a2d55]">
+                        Entrada: {formatarData(registro.hora_entrada)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                </div>
+              ) : null}
             </div>
           </div>
+        </section>
+
+        <section className="mt-5 rounded-xl border border-[#eadde3] bg-white shadow-sm">
+            <form
+              onSubmit={consultarRegistros}
+              className="flex flex-col gap-4 border-b border-[#f0e3e8] px-4 py-4 sm:px-5"
+            >
+              <div>
+                <h2 className="text-lg font-bold">Consultar</h2>
+                <p className="mt-1 text-sm text-[#6f4358]">
+                  Pesquise registros por periodo, nome, documento e situacao operacional.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 rounded-lg bg-[#fffafb] p-3 lg:grid-cols-[180px_180px_minmax(220px,1fr)_auto_auto]">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Data inicial</span>
+                  <input
+                    type="date"
+                    value={consultaDataInicio}
+                    onChange={(event) => setConsultaDataInicio(event.target.value)}
+                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Data final</span>
+                  <input
+                    type="date"
+                    value={consultaDataFim}
+                    onChange={(event) => setConsultaDataFim(event.target.value)}
+                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
+                    Pesquisar nome ou documento
+                  </span>
+                  <input
+                    value={consultaPesquisa}
+                    onChange={(event) => setConsultaPesquisa(event.target.value)}
+                    placeholder="Ex.: Marcelo ou 123456789"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  className="self-end rounded-md bg-[#97003f] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#7b0034]"
+                >
+                  Consultar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={limparConsulta}
+                  className="self-end rounded-md border border-[#d7b8c7] bg-white px-4 py-2.5 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                >
+                  Limpar filtros
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap gap-2">
+                {[
+                  { id: 'todos', label: 'Todos' },
+                  { id: 'dentro', label: 'So dentro' },
+                  { id: 'reentrada', label: 'So reentrada' },
+                  { id: 'saida', label: 'So saida' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setConsultaFiltro(item.id as FiltroConsulta)}
+                    className={`rounded-full px-4 py-2 text-sm font-bold transition ${
+                      consultaFiltro === item.id
+                        ? 'border border-[#97003f] bg-[#97003f] text-white shadow-sm'
+                        : 'border border-[#d7b8c7] bg-white text-[#97003f] hover:bg-[#fff0f6]'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+                </div>
+
+                {(consultaDataInicio || consultaDataFim || consultaPesquisa.trim() || consultaFiltro !== 'todos') && (
+                  <div className="text-sm font-medium text-[#8a2d55]">
+                    Filtros ativos
+                  </div>
+                )}
+              </div>
+            </form>
+
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1080px] text-left text-sm">
+                <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
+                  <tr>
+                    <th className="px-4 py-3">Foto</th>
+                    <th className="px-4 py-3">Nome</th>
+                    <th className="px-4 py-3">Documento</th>
+                    <th className="px-4 py-3">Empresa</th>
+                    <th className="px-4 py-3">Servico</th>
+                    <th className="px-4 py-3">Destino</th>
+                    <th className="px-4 py-3">Entrada</th>
+                    <th className="px-4 py-3">Saida</th>
+                    <th className="px-4 py-3">Situacao</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#f3e8ed]">
+                  {!consultaRegistros.length && !consultaDataInicio && !consultaDataFim && !consultaPesquisa.trim() && (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-8 text-center text-[#8a2d55]">
+                        Preencha uma data ou pesquisa para carregar os registros.
+                      </td>
+                    </tr>
+                  )}
+
+                  {consultaRegistros.length > 0 && consultaRegistrosFiltrados.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-8 text-center text-[#8a2d55]">
+                        Nenhum registro encontrado para o filtro selecionado.
+                      </td>
+                    </tr>
+                  )}
+
+                  {consultaRegistrosFiltrados.map((registro) => {
+                    const situacao = !registro.hora_saida
+                      ? 'Dentro'
+                      : idsReentrada.has(registro.id)
+                        ? 'Reentrada'
+                        : 'Saida'
+
+                    return (
+                      <tr key={`consulta-${registro.id}`} className="hover:bg-[#fffafb]">
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              registro.foto_url
+                                ? setImagemAberta({
+                                    alt: `Foto de ${registro.nome}`,
+                                    src: registro.foto_url,
+                                  })
+                                : undefined
+                            }
+                            className="size-12 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
+                          >
+                            {registro.foto_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={registro.foto_url}
+                                alt={`Foto de ${registro.nome}`}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="grid h-full place-items-center text-sm font-black text-[#97003f]">
+                                {registro.nome?.charAt(0).toUpperCase() || '?'}
+                              </div>
+                            )}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 font-semibold">{texto(registro.nome)}</td>
+                        <td className="px-4 py-3 text-[#6f4358]">{texto(registro.documento)}</td>
+                        <td className="px-4 py-3 text-[#6f4358]">{texto(registro.empresa)}</td>
+                        <td className="px-4 py-3 text-[#6f4358]">{texto(registro.servico)}</td>
+                        <td className="px-4 py-3 text-[#6f4358]">{texto(registro.destino)}</td>
+                        <td className="px-4 py-3 text-[#6f4358]">{formatarData(registro.hora_entrada)}</td>
+                        <td className="px-4 py-3 text-[#6f4358]">
+                          {registro.hora_saida ? formatarData(registro.hora_saida) : '-'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-[#fff0f6] px-3 py-1 text-xs font-bold text-[#97003f]">
+                            {situacao}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
         </section>
       </div>
 
