@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { BrandMark } from '../components/BrandMark'
 import { ImageLightbox } from '../components/ImageLightbox'
 import { lerUsuarioLogado, limparSessaoUsuario } from '../lib/auth'
-import { listarLogs, LogSistema, registrarLog } from '../lib/logs'
+import { formatarAcaoLog, listarLogs, LogSistema, opcoesAcaoLog, registrarLog } from '../lib/logs'
 import { exportarRelatorioExcel, exportarRelatorioPdf } from '../lib/reports'
 import { identificarReentradasMesmoDia, obterSituacaoRegistro } from '../lib/status'
 import { supabase } from '../lib/supabase'
@@ -117,6 +117,11 @@ export default function Admin() {
   const [alterandoUsuario, setAlterandoUsuario] = useState<string | null>(null)
   const [salvandoSenha, setSalvandoSenha] = useState(false)
   const [carregandoLogs, setCarregandoLogs] = useState(false)
+  const [logsConsultaExecutada, setLogsConsultaExecutada] = useState(false)
+  const [dataInicioLog, setDataInicioLog] = useState('')
+  const [dataFimLog, setDataFimLog] = useState('')
+  const [pesquisaLog, setPesquisaLog] = useState('')
+  const [acaoLog, setAcaoLog] = useState<'todos' | LogSistema['acao']>('todos')
   const [erro, setErro] = useState('')
   const [avisoLogs, setAvisoLogs] = useState('')
   const router = useRouter()
@@ -198,8 +203,15 @@ export default function Admin() {
   async function carregarLogs() {
     setCarregandoLogs(true)
     setAvisoLogs('')
+    setLogsConsultaExecutada(true)
 
-    const { data, error } = await listarLogs()
+    const { data, error } = await listarLogs({
+      limite: 100,
+      dataInicio: dataInicioLog,
+      dataFim: dataFimLog,
+      pesquisa: pesquisaLog,
+      acao: acaoLog === 'todos' ? '' : acaoLog,
+    })
 
     if (error) {
       setLogs([])
@@ -227,7 +239,10 @@ export default function Admin() {
         setAdmin(usuario)
         setCarregando(true)
         setErro('')
-        await Promise.all([carregarUsuarios(), carregarLogs(), carregarDentroAgora()])
+        await Promise.all([carregarUsuarios(), carregarDentroAgora()])
+        setLogs([])
+        setAvisoLogs('')
+        setLogsConsultaExecutada(false)
         setRegistros([])
         setCarregando(false)
       } catch {
@@ -251,6 +266,19 @@ export default function Admin() {
   }, [dentroAgora, registros, usuarios])
 
   const idsReentrada = useMemo(() => identificarReentradasMesmoDia(registros), [registros])
+
+  const resumoLogs = useMemo(() => {
+    if (avisoLogs) return avisoLogs
+    if (!logs.length) return 'Nenhum log encontrado para os filtros aplicados.'
+
+    const total = logs.length
+    const descricaoAcao =
+      acaoLog === 'todos'
+        ? 'todas as acoes'
+        : formatarAcaoLog(acaoLog)
+
+    return `${total} ${total === 1 ? 'registro localizado' : 'registros localizados'} em ${descricaoAcao.toLowerCase()}.`
+  }, [acaoLog, avisoLogs, logs])
 
   async function criarUsuario(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -615,13 +643,6 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f3e8ed]">
-                  {!registros.length && !dataInicio && !dataFim && !pesquisaRegistro.trim() && (
-                    <tr>
-                      <td colSpan={14} className="px-4 py-8 text-center text-[#8a2d55]">
-                        Preencha uma data ou pesquisa para carregar os registros.
-                      </td>
-                    </tr>
-                  )}
                   {registros.map((registro) => (
                     <tr key={registro.id} className="hover:bg-[#fffafb]">
                       <td className="px-4 py-3">
@@ -726,6 +747,13 @@ export default function Admin() {
                       </td>
                     </tr>
                   ))}
+                  {!registros.length && !dataInicio && !dataFim && !pesquisaRegistro.trim() && (
+                    <tr>
+                      <td colSpan={14} className="px-4 py-8 text-center text-[#8a2d55]">
+                        Preencha uma data ou pesquisa para carregar os registros.
+                      </td>
+                    </tr>
+                  )}
                   {registros.length === 0 && (dataInicio || dataFim || pesquisaRegistro.trim()) && (
                     <tr>
                       <td colSpan={14} className="px-4 py-8 text-center text-[#8a2d55]">
@@ -900,14 +928,36 @@ export default function Admin() {
         {aba === 'logs' && (
           <section className="rounded-lg border border-[#eadde3] bg-white shadow-sm">
             <div className="flex flex-col gap-3 border-b border-[#f0e3e8] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-              <h2 className="text-lg font-bold">Logs do sistema</h2>
-              <button
-                type="button"
-                onClick={carregarLogs}
-                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-              >
-                {carregandoLogs ? 'Atualizando...' : 'Atualizar logs'}
-              </button>
+              <div>
+                <h2 className="text-lg font-bold">Logs do sistema</h2>
+                <p className="mt-1 text-sm text-[#6f4358]">
+                  Auditoria das acoes operacionais, administrativas e exportacoes realizadas no sistema.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDataInicioLog('')
+                    setDataFimLog('')
+                    setPesquisaLog('')
+                    setAcaoLog('todos')
+                    setAvisoLogs('')
+                    setLogs([])
+                    setLogsConsultaExecutada(false)
+                  }}
+                  className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                >
+                  Limpar filtros
+                </button>
+                <button
+                  type="button"
+                  onClick={carregarLogs}
+                  className="rounded-md bg-[#97003f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#7b0034]"
+                >
+                  {carregandoLogs ? 'Consultando...' : 'Consultar logs'}
+                </button>
+              </div>
             </div>
 
             {avisoLogs && (
@@ -916,13 +966,81 @@ export default function Admin() {
               </div>
             )}
 
+            <div className="border-b border-[#f0e3e8] bg-[#fffafb] px-4 py-4 sm:px-5">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[180px_180px_220px_minmax(0,1fr)]">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Data inicial</span>
+                  <input
+                    type="date"
+                    value={dataInicioLog}
+                    onChange={(event) => setDataInicioLog(event.target.value)}
+                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Data final</span>
+                  <input
+                    type="date"
+                    value={dataFimLog}
+                    onChange={(event) => setDataFimLog(event.target.value)}
+                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Tipo de acao</span>
+                  <select
+                    value={acaoLog}
+                    onChange={(event) => setAcaoLog(event.target.value as typeof acaoLog)}
+                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                  >
+                    <option value="todos">Todas as acoes</option>
+                    {opcoesAcaoLog.map((opcao) => (
+                      <option key={opcao.value} value={opcao.value}>
+                        {opcao.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Pesquisar nos logs</span>
+                  <input
+                    value={pesquisaLog}
+                    onChange={(event) => setPesquisaLog(event.target.value)}
+                    placeholder="Nome, e-mail, acao ou detalhe"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                  />
+                </label>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold">
+                <span className="rounded-full bg-white px-3 py-1 text-[#8a2d55]">
+                  Limite de exibicao: 100 registros
+                </span>
+                {dataInicioLog || dataFimLog || pesquisaLog.trim() || acaoLog !== 'todos' ? (
+                  <span className="rounded-full bg-[#fff0f6] px-3 py-1 text-[#97003f]">
+                    Filtros ativos
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            {!avisoLogs && logsConsultaExecutada && (
+              <div className="border-b border-[#f0e3e8] px-4 py-3 text-sm font-medium text-[#8a2d55] sm:px-5">
+                {resumoLogs}
+              </div>
+            )}
+
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left text-sm">
+              <table className="w-full min-w-[1040px] text-left text-sm">
                 <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
                   <tr>
                     <th className="px-4 py-3">Data</th>
                     <th className="px-4 py-3">Acao</th>
-                    <th className="px-4 py-3">Usuario</th>
+                    <th className="px-4 py-3">Operador</th>
+                    <th className="px-4 py-3">E-mail</th>
                     <th className="px-4 py-3">Detalhes</th>
                   </tr>
                 </thead>
@@ -930,17 +1048,20 @@ export default function Admin() {
                   {logs.map((log) => (
                     <tr key={log.id} className="hover:bg-[#fffafb]">
                       <td className="px-4 py-3 text-[#6f4358]">{formatarData(log.created_at)}</td>
-                      <td className="px-4 py-3 font-semibold text-[#2b1420]">{log.acao}</td>
-                      <td className="px-4 py-3 text-[#6f4358]">
-                        {texto(log.usuario_nome)} {log.usuario_email ? `(${log.usuario_email})` : ''}
+                      <td className="px-4 py-3">
+                        <span className="rounded-full bg-[#fff0f6] px-3 py-1 text-xs font-bold text-[#97003f]">
+                          {formatarAcaoLog(log.acao)}
+                        </span>
                       </td>
+                      <td className="px-4 py-3 font-semibold text-[#2b1420]">{texto(log.usuario_nome)}</td>
+                      <td className="px-4 py-3 text-[#6f4358]">{texto(log.usuario_email)}</td>
                       <td className="px-4 py-3 text-[#6f4358]">{texto(log.detalhes)}</td>
                     </tr>
                   ))}
-                  {!logs.length && !avisoLogs && (
+                  {!logs.length && !avisoLogs && logsConsultaExecutada && (
                     <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-[#8a2d55]">
-                        Nenhum log registrado ate o momento.
+                      <td colSpan={5} className="px-4 py-8 text-center text-[#8a2d55]">
+                        Nenhum log encontrado para os filtros informados.
                       </td>
                     </tr>
                   )}

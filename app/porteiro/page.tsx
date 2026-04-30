@@ -508,6 +508,7 @@ export default function Porteiro() {
   }, [consultaExecutada, consultaFiltro, consultaRegistrosFiltrados])
 
   const erroFormularioEntrada = useMemo(() => {
+    if (form.documento.trim().length !== 11) return ''
     if (!erro) return ''
 
     const mensagensFormulario = [
@@ -526,7 +527,7 @@ export default function Porteiro() {
     ]
 
     return mensagensFormulario.some((mensagem) => erro.startsWith(mensagem)) ? erro : ''
-  }, [erro])
+  }, [erro, form.documento])
 
   const registrosSelecionadosParaExportacao = useMemo(() => {
     const selecionados = consultaRegistrosFiltrados.filter((registro) =>
@@ -542,12 +543,17 @@ export default function Porteiro() {
     const proximoValor =
       campo === 'nome'
         ? limparNome(valor)
-        : campo === 'documento' || campo === 'telefone'
-          ? limparNumero(valor)
-          : valor
+        : campo === 'documento'
+          ? limparNumero(valor).slice(0, 11)
+          : campo === 'telefone'
+            ? limparNumero(valor)
+            : valor
 
     if (campo === 'documento') {
       setAvisoAutopreenchimento('')
+      if (limparNumero(valor).length < 11) {
+        setErro('')
+      }
     }
 
     setForm((atual) => ({ ...atual, [campo]: proximoValor }))
@@ -583,6 +589,20 @@ export default function Porteiro() {
       setEventoModalAberto(false)
     }
   }, [limparListaEvento])
+
+  const limparFormularioPorCpf = useCallback((cpf: string) => {
+    if (fotoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(fotoPreview)
+    }
+
+    setFoto(null)
+    setFotoPreview('')
+    setForm({
+      ...formularioInicial,
+      documento: cpf,
+    })
+    resetarEvento()
+  }, [fotoPreview, resetarEvento])
 
   const aplicarHistoricoPorCpf = useCallback((registro: Registro, cpf: string) => {
     if (fotoPreview.startsWith('blob:')) {
@@ -622,12 +642,13 @@ export default function Porteiro() {
     }
 
     if (!data) {
+      limparFormularioPorCpf(cpf)
       setAvisoAutopreenchimento('CPF nao encontrado no historico. Continue com o preenchimento manual.')
       return
     }
 
     aplicarHistoricoPorCpf(data as Registro, cpf)
-  }, [aplicarHistoricoPorCpf])
+  }, [aplicarHistoricoPorCpf, limparFormularioPorCpf])
 
   useEffect(() => {
     const cpf = form.documento.trim()
