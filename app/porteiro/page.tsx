@@ -8,6 +8,7 @@ import { lerUsuarioLogado, limparSessaoUsuario } from '../lib/auth'
 import { registrarLog } from '../lib/logs'
 import { otimizarFoto } from '../lib/photo'
 import { exportarRelatorioExcel, exportarRelatorioPdf } from '../lib/reports'
+import { identificarReentradasMesmoDia, obterSituacaoRegistro } from '../lib/status'
 import { supabase } from '../lib/supabase'
 
 type Perfil = 'admin' | 'porteiro'
@@ -129,28 +130,6 @@ function ehMesmoDia(dataIso: string, referencia: Date) {
     data.getMonth() === referencia.getMonth() &&
     data.getDate() === referencia.getDate()
   )
-}
-
-function identificarReentradas(registros: Registro[]) {
-  const chavesReentrada = new Set<string>()
-  const historico = [...registros].sort(
-    (a, b) => new Date(a.hora_entrada).getTime() - new Date(b.hora_entrada).getTime()
-  )
-  const jaSaiuPorPessoa = new Set<string>()
-
-  historico.forEach((registro) => {
-    const chave = chaveRegistro(registro)
-
-    if (jaSaiuPorPessoa.has(chave)) {
-      chavesReentrada.add(registro.id)
-    }
-
-    if (registro.hora_saida) {
-      jaSaiuPorPessoa.add(chave)
-    }
-  })
-
-  return chavesReentrada
 }
 
 function formatarData(valor: string) {
@@ -416,7 +395,10 @@ export default function Porteiro() {
     return formatarData(dentro[0].hora_entrada)
   }, [dentro])
 
-  const idsReentrada = useMemo(() => identificarReentradas([...dentro, ...saidos]), [dentro, saidos])
+  const idsReentrada = useMemo(
+    () => identificarReentradasMesmoDia([...dentro, ...saidos]),
+    [dentro, saidos]
+  )
 
   const dentroFiltrado = useMemo(() => {
     const termo = buscaDentro.trim().toLowerCase()
@@ -2115,11 +2097,7 @@ export default function Porteiro() {
                   )}
 
                   {consultaRegistrosFiltrados.map((registro) => {
-                    const situacao = !registro.hora_saida
-                      ? 'Dentro'
-                      : idsReentrada.has(registro.id)
-                        ? 'Reentrada'
-                        : 'Saida'
+                          const situacao = obterSituacaoRegistro(registro, idsReentrada)
 
                     return (
                       <tr key={`consulta-${registro.id}`} className="hover:bg-[#fffafb]">

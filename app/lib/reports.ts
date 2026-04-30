@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf'
 import * as XLSX from 'xlsx'
+import { identificarReentradasMesmoDia, obterSituacaoRegistro } from './status'
 
 type RegistroRelatorio = {
   destino?: string | null
@@ -13,6 +14,7 @@ type RegistroRelatorio = {
   evento_recebimento_em?: string | null
   evento_responsavel?: string | null
   foto_url?: string | null
+  id?: string
   hora_entrada?: string | null
   hora_saida?: string | null
   itens_entrada?: string | null
@@ -160,6 +162,12 @@ function ehPdfUrl(url?: string | null) {
 }
 
 export function exportarRelatorioExcel(registros: RegistroRelatorio[]) {
+  const idsReentrada = identificarReentradasMesmoDia(
+    registros.filter((registro): registro is RegistroRelatorio & { id: string; hora_entrada: string } =>
+      Boolean(registro.id && registro.hora_entrada)
+    ) as Array<RegistroRelatorio & { id: string; hora_entrada: string }>
+  )
+
   const linhas = registros.map((registro) => ({
     Nome: limparTexto(registro.nome),
     CPF: formatarCpf(registro.documento),
@@ -178,6 +186,17 @@ export function exportarRelatorioExcel(registros: RegistroRelatorio[]) {
     Email_Operador_Entrada: limparTexto(registro.operador_entrada_email),
     Entrada: formatarData(registro.hora_entrada),
     Saida: formatarData(registro.hora_saida),
+    Situacao: registro.id
+      ? obterSituacaoRegistro(
+          {
+            id: registro.id,
+            hora_saida: registro.hora_saida,
+          },
+          idsReentrada
+        )
+      : registro.hora_saida
+        ? 'Saida'
+        : 'Dentro',
     Foto_Visitante: registro.foto_url || '',
     Anexo_Evento: registro.evento_lista_foto_url || '',
   }))
@@ -215,6 +234,11 @@ export async function exportarRelatorioPdf(registros: RegistroRelatorio[]) {
     format: 'a4',
     unit: 'mm',
   })
+  const idsReentrada = identificarReentradasMesmoDia(
+    registros.filter((registro): registro is RegistroRelatorio & { id: string; hora_entrada: string } =>
+      Boolean(registro.id && registro.hora_entrada)
+    ) as Array<RegistroRelatorio & { id: string; hora_entrada: string }>
+  )
 
   const logo = await carregarLogo()
   const fotoCache = new Map<string, string | null>()
@@ -266,6 +290,20 @@ export async function exportarRelatorioPdf(registros: RegistroRelatorio[]) {
       ['Itens', registro.entrada_evento ? formatarItensParaPdf(registro.itens_entrada) || '-' : '-'],
       ['Entrada', formatarData(registro.hora_entrada)],
       ['Saida', formatarData(registro.hora_saida)],
+      [
+        'Situacao',
+        registro.id
+          ? obterSituacaoRegistro(
+              {
+                id: registro.id,
+                hora_saida: registro.hora_saida,
+              },
+              idsReentrada
+            )
+          : registro.hora_saida
+            ? 'Saida'
+            : 'Dentro',
+      ],
     ] as const
 
     let cursorY = 60

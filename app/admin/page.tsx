@@ -7,6 +7,7 @@ import { ImageLightbox } from '../components/ImageLightbox'
 import { lerUsuarioLogado, limparSessaoUsuario } from '../lib/auth'
 import { listarLogs, LogSistema, registrarLog } from '../lib/logs'
 import { exportarRelatorioExcel, exportarRelatorioPdf } from '../lib/reports'
+import { identificarReentradasMesmoDia, obterSituacaoRegistro } from '../lib/status'
 import { supabase } from '../lib/supabase'
 
 type Perfil = 'admin' | 'porteiro'
@@ -248,6 +249,8 @@ export default function Admin() {
       { rotulo: 'Usuarios ativos', valor: usuariosAtivos },
     ]
   }, [dentroAgora, registros, usuarios])
+
+  const idsReentrada = useMemo(() => identificarReentradasMesmoDia(registros), [registros])
 
   async function criarUsuario(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -608,12 +611,13 @@ export default function Admin() {
                     <th className="px-4 py-3">Anexo</th>
                     <th className="px-4 py-3">Entrada</th>
                     <th className="px-4 py-3">Saida</th>
+                    <th className="px-4 py-3">Situacao</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f3e8ed]">
                   {!registros.length && !dataInicio && !dataFim && !pesquisaRegistro.trim() && (
                     <tr>
-                      <td colSpan={13} className="px-4 py-8 text-center text-[#8a2d55]">
+                      <td colSpan={14} className="px-4 py-8 text-center text-[#8a2d55]">
                         Preencha uma data ou pesquisa para carregar os registros.
                       </td>
                     </tr>
@@ -703,11 +707,28 @@ export default function Admin() {
                           </span>
                         )}
                       </td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const situacao = obterSituacaoRegistro(registro, idsReentrada)
+                          const estilo =
+                            situacao === 'Dentro'
+                              ? 'bg-[#ffe6f0] text-[#97003f]'
+                              : situacao === 'Reentrada'
+                                ? 'bg-[#fff5d6] text-[#9a6800]'
+                                : 'bg-[#f5eef2] text-[#6f4358]'
+
+                          return (
+                            <span className={`rounded-full px-3 py-1 text-xs font-bold ${estilo}`}>
+                              {situacao}
+                            </span>
+                          )
+                        })()}
+                      </td>
                     </tr>
                   ))}
                   {registros.length === 0 && (dataInicio || dataFim || pesquisaRegistro.trim()) && (
                     <tr>
-                      <td colSpan={13} className="px-4 py-8 text-center text-[#8a2d55]">
+                      <td colSpan={14} className="px-4 py-8 text-center text-[#8a2d55]">
                         Nenhum registro encontrado.
                       </td>
                     </tr>
