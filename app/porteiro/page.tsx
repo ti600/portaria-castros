@@ -391,9 +391,16 @@ export default function Porteiro() {
   }, [fotoPreview])
 
   const ultimaEntrada = useMemo(() => {
-    if (!dentro[0]) return '-'
-    return formatarData(dentro[0].hora_entrada)
-  }, [dentro])
+    const registrosOrdenados = [...dentro, ...saidos]
+      .filter((registro) => Boolean(registro.hora_entrada))
+      .sort(
+        (a, b) =>
+          new Date(b.hora_entrada || 0).getTime() - new Date(a.hora_entrada || 0).getTime()
+      )
+
+    if (!registrosOrdenados[0]?.hora_entrada) return '-'
+    return formatarData(registrosOrdenados[0].hora_entrada)
+  }, [dentro, saidos])
 
   const idsReentrada = useMemo(
     () => identificarReentradasMesmoDia([...dentro, ...saidos]),
@@ -1258,9 +1265,65 @@ export default function Porteiro() {
 
   if (carregando && !usuario) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#fbf7f8] px-6 text-[#2b1420]">
-        <div className="rounded-lg border border-[#eadde3] bg-white px-6 py-5 shadow-sm">
-          Carregando portaria...
+      <main className="min-h-screen bg-[#fbf7f8] px-6 py-8 text-[#2b1420]">
+        <div className="mx-auto w-full max-w-[1440px]">
+          <div className="rounded-xl border border-[#eadde3] bg-white px-5 py-5 shadow-sm">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="flex flex-col gap-3">
+                <BrandMark compact label="Portaria" title="Controle de Entrada" />
+                <p className="max-w-2xl text-sm text-[#6f4358]">
+                  Preparando o ambiente operacional da portaria.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-28 animate-pulse rounded-md bg-[#f7e5ec]" />
+                <div className="h-10 w-24 animate-pulse rounded-md bg-[#f7e5ec]" />
+                <div className="h-10 w-20 animate-pulse rounded-md bg-[#f7e5ec]" />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+            {[1, 2, 3].map((item) => (
+              <div
+                key={`loading-card-${item}`}
+                className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm"
+              >
+                <div className="h-4 w-24 animate-pulse rounded bg-[#f7e5ec]" />
+                <div className="mt-4 h-8 w-28 animate-pulse rounded bg-[#f3d3df]" />
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
+            <div className="rounded-xl border border-[#eadde3] bg-white p-5 shadow-sm">
+              <div className="h-6 w-40 animate-pulse rounded bg-[#f3d3df]" />
+              <div className="mt-2 h-4 w-72 animate-pulse rounded bg-[#f7e5ec]" />
+
+              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div key={`loading-input-${index}`}>
+                    <div className="mb-2 h-4 w-24 animate-pulse rounded bg-[#f7e5ec]" />
+                    <div className="h-12 animate-pulse rounded-md bg-[#fbf1f5]" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-5">
+              {[1, 2, 3].map((item) => (
+                <div
+                  key={`loading-side-${item}`}
+                  className="rounded-xl border border-[#eadde3] bg-white p-5 shadow-sm"
+                >
+                  <div className="h-6 w-36 animate-pulse rounded bg-[#f3d3df]" />
+                  <div className="mt-2 h-4 w-52 animate-pulse rounded bg-[#f7e5ec]" />
+                  <div className="mt-5 h-12 animate-pulse rounded-md bg-[#fbf1f5]" />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </main>
     )

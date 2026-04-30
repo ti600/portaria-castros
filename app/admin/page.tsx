@@ -442,9 +442,74 @@ export default function Admin() {
 
   if (carregando && !admin) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#fbf7f8] px-6 text-[#2b1420]">
-        <div className="rounded-lg border border-[#eadde3] bg-white px-6 py-5 shadow-sm">
-          Carregando painel...
+      <main className="min-h-screen bg-[#fbf7f8] px-6 py-8 text-[#2b1420]">
+        <div className="mx-auto w-full max-w-[1440px]">
+          <div className="rounded-xl border border-[#eadde3] bg-white px-5 py-5 shadow-sm">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="flex flex-col gap-3">
+                <BrandMark compact label="Administracao" title="Painel da Portaria" />
+                <p className="max-w-2xl text-sm text-[#6f4358]">
+                  Preparando o ambiente administrativo e validando as permissoes do sistema.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-28 animate-pulse rounded-md bg-[#f7e5ec]" />
+                <div className="h-10 w-28 animate-pulse rounded-md bg-[#f7e5ec]" />
+                <div className="h-10 w-20 animate-pulse rounded-md bg-[#f7e5ec]" />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+            {[1, 2, 3].map((item) => (
+              <div
+                key={`loading-admin-card-${item}`}
+                className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm"
+              >
+                <div className="h-4 w-28 animate-pulse rounded bg-[#f7e5ec]" />
+                <div className="mt-4 h-8 w-24 animate-pulse rounded bg-[#f3d3df]" />
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[0.82fr_1.18fr]">
+            <div className="rounded-xl border border-[#eadde3] bg-white p-5 shadow-sm">
+              <div className="h-6 w-36 animate-pulse rounded bg-[#f3d3df]" />
+              <div className="mt-2 h-4 w-64 animate-pulse rounded bg-[#f7e5ec]" />
+
+              <div className="mt-6 grid grid-cols-1 gap-4">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={`loading-admin-form-${index}`}>
+                    <div className="mb-2 h-4 w-24 animate-pulse rounded bg-[#f7e5ec]" />
+                    <div className="h-12 animate-pulse rounded-md bg-[#fbf1f5]" />
+                  </div>
+                ))}
+                <div className="mt-2 h-12 animate-pulse rounded-md bg-[#f3d3df]" />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[#eadde3] bg-white p-5 shadow-sm">
+              <div className="h-6 w-44 animate-pulse rounded bg-[#f3d3df]" />
+              <div className="mt-2 h-4 w-56 animate-pulse rounded bg-[#f7e5ec]" />
+
+              <div className="mt-6 space-y-4">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    key={`loading-admin-list-${index}`}
+                    className="rounded-lg border border-[#f0e3e8] bg-[#fffafb] p-4"
+                  >
+                    <div className="h-4 w-40 animate-pulse rounded bg-[#f3d3df]" />
+                    <div className="mt-2 h-4 w-56 animate-pulse rounded bg-[#f7e5ec]" />
+                    <div className="mt-4 flex gap-2">
+                      <div className="h-9 w-24 animate-pulse rounded-md bg-[#f7e5ec]" />
+                      <div className="h-9 w-28 animate-pulse rounded-md bg-[#f7e5ec]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     )
