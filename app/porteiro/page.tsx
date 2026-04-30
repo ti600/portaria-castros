@@ -536,6 +536,8 @@ export default function Porteiro() {
     return selecionados.length ? selecionados : consultaRegistrosFiltrados
   }, [consultaRegistrosFiltrados, consultaSelecionados])
 
+  const formularioLiberado = form.documento.trim().length === 11
+
   function alterarCampo(campo: keyof FormularioEntrada, valor: string) {
     const proximoValor =
       campo === 'nome'
@@ -620,7 +622,7 @@ export default function Porteiro() {
     }
 
     if (!data) {
-      setAvisoAutopreenchimento('')
+      setAvisoAutopreenchimento('CPF nao encontrado no historico. Continue com o preenchimento manual.')
       return
     }
 
@@ -1318,10 +1320,40 @@ export default function Porteiro() {
             <div className="mb-5">
               <h2 className="text-lg font-bold">Registrar entrada</h2>
               <p className="mt-1 text-sm text-[#6f4358]">
-                Preencha os dados essenciais e registre a entrada com agilidade.
+                Inicie pelo CPF para localizar o visitante ou abrir um novo cadastro com mais agilidade.
               </p>
             </div>
 
+            <div className="rounded-lg border border-[#eadde3] bg-[#fffafb] p-4">
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
+                  CPF *
+                </span>
+                <input
+                  value={formatarCpf(form.documento)}
+                  onChange={(event) => alterarCampo('documento', event.target.value)}
+                  className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-3 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                  inputMode="numeric"
+                  placeholder="000.000.000-00"
+                  required
+                  autoFocus
+                />
+              </label>
+
+              <p className="mt-3 text-sm text-[#6f4358]">
+                {formularioLiberado
+                  ? 'CPF validado. Continue com o registro abaixo.'
+                  : 'Digite os 11 digitos do CPF para iniciar o atendimento.'}
+              </p>
+            </div>
+
+            {avisoAutopreenchimento ? (
+              <div className="rounded-md border border-[#d8d1b1] bg-[#fff8da] px-3 py-2 text-sm text-[#7a5b00]">
+                {avisoAutopreenchimento}
+              </div>
+            ) : null}
+
+            {formularioLiberado ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="block">
                 <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Nome *</span>
@@ -1335,25 +1367,7 @@ export default function Porteiro() {
                 />
               </label>
 
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-                  CPF *
-                </span>
-                <input
-                  value={formatarCpf(form.documento)}
-                  onChange={(event) => alterarCampo('documento', event.target.value)}
-                  className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                  inputMode="numeric"
-                  placeholder="000.000.000-00"
-                  required
-                />
-              </label>
-
-              {avisoAutopreenchimento ? (
-                <div className="md:col-span-2 rounded-md border border-[#d8d1b1] bg-[#fff8da] px-3 py-2 text-sm text-[#7a5b00]">
-                  {avisoAutopreenchimento}
-                </div>
-              ) : null}
+              <input type="hidden" value={form.documento} readOnly />
 
               <label className="block">
                 <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Telefone *</span>
@@ -1551,6 +1565,7 @@ export default function Porteiro() {
                 </div>
               </div>
             </div>
+            ) : null}
 
             {cameraAberta && (
               <div className="hidden" aria-hidden="true" />
@@ -1563,28 +1578,30 @@ export default function Porteiro() {
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="submit"
-                  disabled={salvandoEntrada}
-                  className="rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
-                >
-                  {salvandoEntrada ? 'Registrando...' : 'Registrar entrada'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForm(formularioInicial)
-                    setAvisoAutopreenchimento('')
-                    ultimoCpfConsultadoRef.current = ''
-                    limparFoto()
-                    setErro('')
-                  }}
-                  className="rounded-md border border-[#d7b8c7] bg-white px-4 py-3 font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-                >
-                  Cancelar
-                </button>
-              </div>
+              {formularioLiberado ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="submit"
+                    disabled={salvandoEntrada}
+                    className="rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
+                  >
+                    {salvandoEntrada ? 'Registrando...' : 'Registrar entrada'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm(formularioInicial)
+                      setAvisoAutopreenchimento('')
+                      ultimoCpfConsultadoRef.current = ''
+                      limparFoto()
+                      setErro('')
+                    }}
+                    className="rounded-md border border-[#d7b8c7] bg-white px-4 py-3 font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : null}
             </div>
           </form>
 

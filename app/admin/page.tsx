@@ -204,7 +204,7 @@ export default function Admin() {
     if (error) {
       setLogs([])
       setAvisoLogs(
-        'Os logs ainda nao estao configurados no Supabase. Execute o arquivo supabase-admin-recursos.sql para habilitar esta area.'
+        'Os logs nao puderam ser carregados. Execute novamente o arquivo supabase-admin-recursos.sql no Supabase para aplicar as permissoes da autenticacao atual.'
       )
       setCarregandoLogs(false)
       return

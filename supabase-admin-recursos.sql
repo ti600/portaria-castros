@@ -15,12 +15,12 @@ begin
     select 1 from pg_policies
     where schemaname = 'public'
       and tablename = 'logs_sistema'
-      and policyname = 'logs_sistema_select_anon'
+      and policyname = 'logs_sistema_select_authenticated'
   ) then
-    create policy logs_sistema_select_anon
+    create policy logs_sistema_select_authenticated
     on public.logs_sistema
     for select
-    to anon
+    to authenticated
     using (true);
   end if;
 
@@ -28,12 +28,12 @@ begin
     select 1 from pg_policies
     where schemaname = 'public'
       and tablename = 'logs_sistema'
-      and policyname = 'logs_sistema_insert_anon'
+      and policyname = 'logs_sistema_insert_authenticated'
   ) then
-    create policy logs_sistema_insert_anon
+    create policy logs_sistema_insert_authenticated
     on public.logs_sistema
     for insert
-    to anon
+    to authenticated
     with check (true);
   end if;
 end $$;
