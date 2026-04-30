@@ -1521,7 +1521,7 @@ export default function Porteiro() {
                       <img
                         src={fotoPreview}
                         alt="Previa da foto"
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-contain bg-white"
                       />
                     ) : (
                       <span className="px-3 text-center text-sm font-semibold text-[#8a2d55]">
@@ -2298,7 +2298,7 @@ export default function Porteiro() {
                     </label>
 
                     <label className="block md:col-span-1">
-                      <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Fone *</span>
+                      <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Telefone *</span>
                       <input
                         value={formatarTelefone(eventoForm.fone)}
                         onChange={(event) => alterarCampoEvento('fone', event.target.value)}
