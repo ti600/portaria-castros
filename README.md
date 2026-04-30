@@ -15,9 +15,10 @@ Crie um arquivo `.env.local` com:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=sua_url_do_supabase
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_chave_anon_do_supabase
+SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key
 ```
 
-O arquivo `.env.example` fica no repositorio apenas como modelo. Nao coloque a chave `service_role` no frontend.
+O arquivo `.env.example` fica no repositorio apenas como modelo. A `SUPABASE_SERVICE_ROLE_KEY` deve ser usada apenas no servidor para criar usuarios e trocar senhas. Nunca exponha essa chave no frontend.
 
 ## Rodar localmente
 
@@ -56,6 +57,7 @@ Esse arquivo cria:
 4. Cadastre as variaveis de ambiente na Vercel:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
 5. Publique o projeto.
 
 ## Deploy em servidor Node.js

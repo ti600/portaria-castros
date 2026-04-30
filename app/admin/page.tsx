@@ -120,6 +120,21 @@ export default function Admin() {
   const [avisoLogs, setAvisoLogs] = useState('')
   const router = useRouter()
 
+  async function obterHeadersAdmin() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session?.access_token) {
+      throw new Error('Sua sessao expirou. Entre novamente para continuar.')
+    }
+
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    }
+  }
+
   async function carregarRegistros() {
     if (!dataInicio && !dataFim && !pesquisaRegistro.trim()) {
       setRegistros([])
@@ -199,24 +214,29 @@ export default function Admin() {
   }
 
   useEffect(() => {
-    const usuario = lerUsuarioLogado()
-
-    if (!usuario || usuario.perfil !== 'admin' || usuario.ativo === false) {
-      router.push('/')
-      return
-    }
-
     async function carregarTudo() {
-      setAdmin(usuario)
-      setCarregando(true)
-      setErro('')
-      await Promise.all([carregarUsuarios(), carregarLogs(), carregarDentroAgora()])
-      setRegistros([])
+      try {
+        const usuario = await lerUsuarioLogado()
 
-      setCarregando(false)
+        if (!usuario || usuario.perfil !== 'admin' || usuario.ativo === false) {
+          router.push('/')
+          return
+        }
+
+        setAdmin(usuario)
+        setCarregando(true)
+        setErro('')
+        await Promise.all([carregarUsuarios(), carregarLogs(), carregarDentroAgora()])
+        setRegistros([])
+        setCarregando(false)
+      } catch {
+        setErro('Nao foi possivel validar sua sessao. Entre novamente.')
+        setCarregando(false)
+        router.push('/')
+      }
     }
 
-    carregarTudo()
+    void carregarTudo()
   }, [router])
 
   const estatisticas = useMemo(() => {
@@ -240,20 +260,30 @@ export default function Admin() {
 
     setSalvandoUsuario(true)
 
-    const { error } = await supabase.from('usuarios').insert({
-      nome: novoUsuario.nome.trim(),
-      email: novoUsuario.email.trim(),
-      senha: novoUsuario.senha,
-      perfil: novoUsuario.perfil,
-      ativo: true,
-    })
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: await obterHeadersAdmin(),
+        body: JSON.stringify({
+          nome: novoUsuario.nome.trim(),
+          email: novoUsuario.email.trim().toLowerCase(),
+          senha: novoUsuario.senha,
+          perfil: novoUsuario.perfil,
+        }),
+      })
 
-    setSalvandoUsuario(false)
+      const resultado = (await response.json().catch(() => null)) as { error?: string } | null
 
-    if (error) {
-      setErro('Nao foi possivel criar o usuario.')
+      if (!response.ok) {
+        throw new Error(resultado?.error || 'Nao foi possivel criar o usuario.')
+      }
+    } catch (error) {
+      setSalvandoUsuario(false)
+      setErro(error instanceof Error ? error.message : 'Nao foi possivel criar o usuario.')
       return
     }
+
+    setSalvandoUsuario(false)
 
     await registrarLog({
       acao: 'usuario_criado',
@@ -303,17 +333,25 @@ export default function Admin() {
 
     setSalvandoSenha(true)
 
-    const { error } = await supabase
-      .from('usuarios')
-      .update({ senha: novaSenha })
-      .eq('id', usuario.id)
+    try {
+      const response = await fetch(`/api/admin/users/${usuario.id}/password`, {
+        method: 'PATCH',
+        headers: await obterHeadersAdmin(),
+        body: JSON.stringify({ senha: novaSenha }),
+      })
 
-    setSalvandoSenha(false)
+      const resultado = (await response.json().catch(() => null)) as { error?: string } | null
 
-    if (error) {
-      setErro('Nao foi possivel atualizar a senha.')
+      if (!response.ok) {
+        throw new Error(resultado?.error || 'Nao foi possivel atualizar a senha.')
+      }
+    } catch (error) {
+      setSalvandoSenha(false)
+      setErro(error instanceof Error ? error.message : 'Nao foi possivel atualizar a senha.')
       return
     }
+
+    setSalvandoSenha(false)
 
     await registrarLog({
       acao: 'senha_alterada',
@@ -356,8 +394,8 @@ export default function Admin() {
     await carregarLogs()
   }
 
-  function handleLogout() {
-    limparSessaoUsuario()
+  async function handleLogout() {
+    await limparSessaoUsuario()
     router.push('/')
   }
 

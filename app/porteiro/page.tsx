@@ -377,22 +377,28 @@ export default function Porteiro() {
   }
 
   useEffect(() => {
-    const usuarioLogado = lerUsuarioLogado()
-
-    if (!usuarioLogado || usuarioLogado.ativo === false) {
-      router.push('/')
-      return
-    }
-
     async function iniciar() {
-      setUsuario(usuarioLogado)
-      setCarregando(true)
-      setErro('')
-      await Promise.all([carregarDentro(), carregarSaidos()])
-      setCarregando(false)
+      try {
+        const usuarioLogado = await lerUsuarioLogado()
+
+        if (!usuarioLogado || usuarioLogado.ativo === false) {
+          router.push('/')
+          return
+        }
+
+        setUsuario(usuarioLogado)
+        setCarregando(true)
+        setErro('')
+        await Promise.all([carregarDentro(), carregarSaidos()])
+        setCarregando(false)
+      } catch {
+        setErro('Nao foi possivel validar sua sessao. Entre novamente.')
+        setCarregando(false)
+        router.push('/')
+      }
     }
 
-    iniciar()
+    void iniciar()
   }, [router])
 
   useEffect(() => {
@@ -1240,8 +1246,8 @@ export default function Porteiro() {
     )
   }
 
-  function handleLogout() {
-    limparSessaoUsuario()
+  async function handleLogout() {
+    await limparSessaoUsuario()
     router.push('/')
   }
 
@@ -1506,7 +1512,7 @@ export default function Porteiro() {
                 <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
                   Foto do visitante
                 </span>
-                <div className="grid gap-3 rounded-lg border border-dashed border-[#d7b8c7] bg-[#fffafb] p-3 sm:grid-cols-[160px_1fr] sm:items-center">
+                <div className="grid gap-3 rounded-lg border border-dashed border-[#d7b8c7] bg-[#fffafb] p-3 sm:grid-cols-[140px_1fr] sm:items-center">
                   <button
                     type="button"
                     onClick={() =>
@@ -1514,14 +1520,14 @@ export default function Porteiro() {
                         ? setImagemAberta({ alt: 'Foto em pre-visualizacao', src: fotoPreview })
                         : undefined
                     }
-                    className="grid aspect-[4/3] place-items-center overflow-hidden rounded-md border border-[#eadde3] bg-white"
+                    className="grid min-h-[220px] place-items-center overflow-hidden rounded-md border border-[#eadde3] bg-white sm:aspect-[3/4] sm:min-h-0"
                   >
                     {fotoPreview ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={fotoPreview}
                         alt="Previa da foto"
-                        className="h-full w-full object-contain bg-white"
+                        className="h-full w-full object-cover object-top bg-white sm:h-full"
                       />
                     ) : (
                       <span className="px-3 text-center text-sm font-semibold text-[#8a2d55]">
