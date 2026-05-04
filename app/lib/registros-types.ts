@@ -30,6 +30,7 @@ export type FormularioEntrada = {
   nome: string
   documento: string
   telefone: string
+  contatoEmergencia: string
   empresa: string
   servico: string
   destino: string
@@ -46,6 +47,7 @@ export type Registro = {
   operador_entrada_nome?: string | null
   documento?: string | null
   telefone?: string | null
+  contato_emergencia?: string | null
   empresa?: string | null
   servico?: string | null
   destino?: string | null

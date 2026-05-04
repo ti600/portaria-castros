@@ -1,6 +1,6 @@
 'use client'
 
-import { ChangeEvent, FormEvent } from 'react'
+import { ChangeEvent, FormEvent, useEffect, useRef } from 'react'
 import { formatarCpf, formatarTelefone, texto } from '../../lib/formatters'
 import { FormularioEntrada, FormularioEvento } from '../../lib/registros-types'
 
@@ -51,6 +51,14 @@ export function EntradaForm({
   onLimparFoto,
   onCancelar,
 }: EntradaFormProps) {
+  const erroRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (erroFormularioEntrada) {
+      erroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [erroFormularioEntrada])
+
   return (
     <form
       onSubmit={onSubmit}
@@ -101,7 +109,6 @@ export function EntradaForm({
               onChange={(event) => onAlterarCampo('nome', event.target.value)}
               className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
               autoCapitalize="words"
-              pattern="[A-Za-z\u00C0-\u00FF' -]+"
               required
             />
           </label>
@@ -117,6 +124,17 @@ export function EntradaForm({
               inputMode="numeric"
               placeholder="(00) 00000-0000"
               required
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Contato de emergencia</span>
+            <input
+              value={formatarTelefone(form.contatoEmergencia)}
+              onChange={(event) => onAlterarCampo('contatoEmergencia', event.target.value)}
+              className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+              inputMode="numeric"
+              placeholder="(00) 00000-0000"
             />
           </label>
 
@@ -287,7 +305,7 @@ export function EntradaForm({
 
       <div className="mt-5">
         {erroFormularioEntrada && (
-          <div className="mb-3 rounded-md border border-[#f1d38a] bg-[#fff7db] px-4 py-3 text-sm font-medium text-[#8a5a00]">
+          <div ref={erroRef} className="mb-3 rounded-md border border-[#f1d38a] bg-[#fff7db] px-4 py-3 text-sm font-medium text-[#8a5a00]">
             {erroFormularioEntrada}
           </div>
         )}

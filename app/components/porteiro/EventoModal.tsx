@@ -1,11 +1,12 @@
 'use client'
 
-import { ChangeEvent, RefObject } from 'react'
+import { ChangeEvent, RefObject, useEffect, useRef } from 'react'
 import { formatarTelefone, limparNumero } from '../../lib/formatters'
 import { FormularioEvento, MaterialEvento } from '../../lib/registros-types'
 
 type EventoModalProps = {
   eventoForm: FormularioEvento
+  erroEvento: string
   eventoListaInputRef: RefObject<HTMLInputElement | null>
   eventoListaFotoPreview: string
   eventoListaFotoNome: string
@@ -32,6 +33,7 @@ type EventoModalProps = {
 
 export function EventoModal({
   eventoForm,
+  erroEvento,
   eventoListaInputRef,
   eventoListaFotoPreview,
   eventoListaFotoNome,
@@ -51,6 +53,14 @@ export function EventoModal({
   onLimparFicha,
   onSalvarFicha,
 }: EventoModalProps) {
+  const erroRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (erroEvento) {
+      erroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [erroEvento])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2b1420]/70 p-4">
       <div className="w-full max-w-6xl rounded-xl border border-[#eadde3] bg-white shadow-xl">
@@ -70,7 +80,10 @@ export function EventoModal({
           </button>
         </div>
 
-        <div className="max-h-[calc(92vh-84px)] overflow-y-auto px-5 py-5">
+        <form
+          onSubmit={(e) => { e.preventDefault(); onSalvarFicha() }}
+          className="max-h-[calc(92vh-84px)] overflow-y-auto px-5 py-5"
+        >
           <div className="rounded-lg border border-[#eadde3] bg-[#fffafb] p-4 text-sm text-[#6f4358]">
             Se a empresa ja trouxe a folha preenchida, basta anexar a foto da lista. Sem a foto, o preenchimento da entrada de materiais passa a ser obrigatorio.
           </div>
@@ -84,6 +97,7 @@ export function EventoModal({
                     value={eventoForm.nome}
                     onChange={(event) => onAlterarCampoEvento('nome', event.target.value)}
                     className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                    required
                   />
                 </label>
 
@@ -111,6 +125,7 @@ export function EventoModal({
                     value={eventoForm.responsavel}
                     onChange={(event) => onAlterarCampoEvento('responsavel', event.target.value)}
                     className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                    required={!eventoListaFotoPreview}
                   />
                 </label>
 
@@ -122,6 +137,7 @@ export function EventoModal({
                     inputMode="numeric"
                     placeholder="(00) 00000-0000"
                     className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                    required={!eventoListaFotoPreview}
                   />
                 </label>
               </div>
@@ -294,6 +310,12 @@ export function EventoModal({
             </div>
           </div>
 
+          {erroEvento && (
+            <div ref={erroRef} className="mt-5 rounded-md border border-[#f1d38a] bg-[#fff7db] px-4 py-3 text-sm font-medium text-[#8a5a00]">
+              {erroEvento}
+            </div>
+          )}
+
           <div className="mt-5 flex flex-wrap justify-end gap-2">
             <button
               type="button"
@@ -310,14 +332,13 @@ export function EventoModal({
               Fechar
             </button>
             <button
-              type="button"
-              onClick={onSalvarFicha}
+              type="submit"
               className="rounded-md bg-[#97003f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#7b0034]"
             >
               Salvar ficha do evento
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   )

@@ -64,6 +64,7 @@ const formularioInicial: FormularioEntrada = {
   nome: '',
   documento: '',
   telefone: '',
+  contatoEmergencia: '',
   empresa: '',
   servico: '',
   destino: '',
@@ -189,6 +190,7 @@ export default function Porteiro() {
   const [cameraAberta, setCameraAberta] = useState(false)
   const [cameraDestino, setCameraDestino] = useState<'visitante' | 'listaEvento'>('visitante')
   const [eventoModalAberto, setEventoModalAberto] = useState(false)
+  const [erroEvento, setErroEvento] = useState('')
   const [confirmacaoEntradaAberta, setConfirmacaoEntradaAberta] = useState(false)
   const [confirmacaoAcao, setConfirmacaoAcao] = useState<ConfirmacaoAcao | null>(null)
   const [carregandoCamera, setCarregandoCamera] = useState(false)
@@ -414,6 +416,7 @@ export default function Porteiro() {
       nome: registro.nome || '',
       documento: cpf,
       telefone: registro.telefone || '',
+      contatoEmergencia: registro.contato_emergencia || '',
       empresa: registro.empresa || '',
       servico: '',
       destino: '',
@@ -622,18 +625,21 @@ export default function Porteiro() {
     }
 
     if (form.entradaEvento === 'sim' && !eventoForm.nome.trim()) {
-      setErro('Informe o nome do evento para continuar.')
+      setErroEvento('Informe o nome do evento para continuar.')
+      setEventoModalAberto(true)
       return false
     }
 
     if (form.entradaEvento === 'sim' && !eventoListaFoto && !eventoListaFotoPreview) {
       if (!eventoForm.responsavel.trim()) {
-        setErro('Informe o responsavel do evento para continuar.')
+        setErroEvento('Informe o responsavel do evento para continuar.')
+        setEventoModalAberto(true)
         return false
       }
 
       if (eventoForm.fone.trim().length !== 11) {
-        setErro('Informe o telefone do evento com DDD e 9 digitos para continuar.')
+        setErroEvento('Informe o telefone do evento com DDD e 9 digitos para continuar.')
+        setEventoModalAberto(true)
         return false
       }
 
@@ -643,7 +649,8 @@ export default function Porteiro() {
           (material) => material.quantidade.trim() && material.discriminacao.trim()
         )
       ) {
-        setErro('Preencha ao menos um material de entrada ou anexe a foto da lista.')
+        setErroEvento('Preencha ao menos um material de entrada ou anexe a foto da lista.')
+        setEventoModalAberto(true)
         return false
       }
     }
@@ -658,7 +665,8 @@ export default function Porteiro() {
           !material.discriminacao.trim()
       )
     ) {
-      setErro('Toda linha com quantidade precisa ter a discriminacao do material.')
+      setErroEvento('Toda linha com quantidade precisa ter a discriminacao do material.')
+      setEventoModalAberto(true)
       return false
     }
 
@@ -668,10 +676,7 @@ export default function Porteiro() {
   function solicitarConfirmacaoEntrada(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!validarEntrada()) {
-      acoesEntradaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      return
-    }
+    if (!validarEntrada()) return
 
     setConfirmacaoEntradaAberta(true)
   }
@@ -1712,7 +1717,8 @@ export default function Porteiro() {
           eventoListaFotoTipo={eventoListaFotoTipo}
           carregandoCamera={carregandoCamera}
           cameraDestino={cameraDestino}
-          onFechar={() => setEventoModalAberto(false)}
+          erroEvento={erroEvento}
+          onFechar={() => { setEventoModalAberto(false); setErroEvento('') }}
           onAlterarCampoEvento={alterarCampoEvento}
           onAdicionarMaterialEvento={adicionarMaterialEvento}
           onAlterarMaterialEvento={alterarMaterialEvento}
@@ -1730,7 +1736,7 @@ export default function Porteiro() {
           onAlterarListaEvento={alterarListaEvento}
           onLimparListaEvento={limparListaEvento}
           onLimparFicha={() => resetarEvento(false)}
-          onSalvarFicha={() => setEventoModalAberto(false)}
+          onSalvarFicha={() => { setEventoModalAberto(false); setErroEvento('') }}
         />
       )}
 
