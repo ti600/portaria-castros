@@ -358,7 +358,7 @@ export default function Porteiro() {
     [consultaRegistrosFiltrados, consultaSelecionados]
   )
 
-  const formularioLiberado = form.documento.trim().length === 11
+  const formularioLiberado = form.documento.trim().length === 11 && validarCPF(form.documento)
 
   function alterarCampo(campo: keyof FormularioEntrada, valor: string) {
     const proximoValor =
