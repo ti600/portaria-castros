@@ -11,6 +11,7 @@ type RegistroAdmin = {
   operador_entrada_email?: string | null
   operador_entrada_nome?: string | null
   documento?: string | null
+  tipo_documento?: string | null
   telefone?: string | null
   empresa?: string | null
   servico?: string | null
@@ -114,7 +115,7 @@ export function RegistrosSection({
 
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-              Pesquisar nome ou CPF
+              Pesquisar nome ou documento
             </span>
             <input
               value={pesquisaRegistro}
@@ -139,7 +140,7 @@ export function RegistrosSection({
             <tr>
               <th className="w-14 px-2 py-3">Foto</th>
               <th className="w-28 px-3 py-3">Nome</th>
-              <th className="w-28 px-3 py-3">CPF</th>
+              <th className="w-28 px-3 py-3">Documento</th>
               <th className="w-28 px-3 py-3">Telefone</th>
               <th className="w-24 px-3 py-3">Empresa</th>
               <th className="w-24 px-3 py-3">Servico</th>
@@ -184,7 +185,16 @@ export function RegistrosSection({
                   </button>
                 </td>
                 <td className="px-4 py-3 font-semibold">{texto(registro.nome)}</td>
-                <td className="px-4 py-3 text-[#6f4358]">{formatarCpf(registro.documento) || '-'}</td>
+                <td className="px-4 py-3 text-[#6f4358]">
+                  {registro.documento ? (
+                    <div>
+                      {registro.tipo_documento === 'rg' && (
+                        <span className="mb-0.5 block text-[10px] font-bold uppercase text-[#8a2d55]">RG</span>
+                      )}
+                      <span>{registro.tipo_documento === 'rg' ? registro.documento : formatarCpf(registro.documento)}</span>
+                    </div>
+                  ) : '-'}
+                </td>
                 <td className="px-4 py-3 text-[#6f4358]">{formatarTelefone(registro.telefone) || '-'}</td>
                 <td className="px-4 py-3 text-[#6f4358]">{texto(registro.empresa)}</td>
                 <td className="px-4 py-3 text-[#6f4358]">{texto(registro.servico)}</td>

@@ -18,6 +18,7 @@ type EntradaFormProps = {
   salvandoEntrada: boolean
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onAlterarCampo: (campo: keyof FormularioEntrada, valor: string) => void
+  onAlternarTipoDocumento: () => void
   onMarcarEventoNao: () => void
   onMarcarEventoSim: () => void
   onAbrirFichaEvento: () => void
@@ -42,6 +43,7 @@ export function EntradaForm({
   salvandoEntrada,
   onSubmit,
   onAlterarCampo,
+  onAlternarTipoDocumento,
   onMarcarEventoNao,
   onMarcarEventoSim,
   onAbrirFichaEvento,
@@ -59,6 +61,8 @@ export function EntradaForm({
     }
   }, [erroFormularioEntrada])
 
+  const ehCpf = form.tipoDocumento === 'cpf'
+
   return (
     <form
       onSubmit={onSubmit}
@@ -67,31 +71,49 @@ export function EntradaForm({
       <div className="mb-5">
         <h2 className="text-lg font-bold">Registrar entrada</h2>
         <p className="mt-1 text-sm text-[#6f4358]">
-          Inicie pelo CPF para localizar o visitante ou abrir um novo cadastro com mais agilidade.
+          {ehCpf
+            ? 'Inicie pelo CPF para localizar o visitante ou abrir um novo cadastro com mais agilidade.'
+            : 'Inicie pelo RG para localizar o visitante ou abrir um novo cadastro com mais agilidade.'}
         </p>
       </div>
 
       <div className="rounded-lg border border-[#eadde3] bg-[#fffafb] p-4">
         <label className="block">
-          <span className="mb-2 block text-sm font-semibold text-[#4a2636]">CPF *</span>
+          <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
+            {ehCpf ? 'CPF *' : 'RG *'}
+          </span>
           <input
-            value={formatarCpf(form.documento)}
+            value={ehCpf ? formatarCpf(form.documento) : form.documento}
             onChange={(event) => onAlterarCampo('documento', event.target.value)}
             className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-3 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-            inputMode="numeric"
-            placeholder="000.000.000-00"
+            inputMode={ehCpf ? 'numeric' : 'text'}
+            placeholder={ehCpf ? '000.000.000-00' : 'Ex.: 12.345.678-9'}
             required
             autoFocus
           />
         </label>
 
         {formularioLiberado ? (
-          <p className="mt-3 text-sm text-[#2a7a3b]">CPF validado. Continue com o registro abaixo.</p>
-        ) : cpfCompletoInvalido ? (
+          <p className="mt-3 text-sm text-[#2a7a3b]">
+            {ehCpf ? 'CPF validado.' : 'RG aceito.'} Continue com o registro abaixo.
+          </p>
+        ) : ehCpf && cpfCompletoInvalido ? (
           <p className="mt-3 text-sm font-medium text-[#97003f]">CPF invalido. Verifique os 11 digitos informados.</p>
         ) : (
-          <p className="mt-3 text-sm text-[#6f4358]">Digite os 11 digitos do CPF para iniciar o atendimento.</p>
+          <p className="mt-3 text-sm text-[#6f4358]">
+            {ehCpf
+              ? 'Digite os 11 digitos do CPF para iniciar o atendimento.'
+              : 'Digite ao menos 5 caracteres do RG para iniciar o atendimento.'}
+          </p>
         )}
+
+        <button
+          type="button"
+          onClick={onAlternarTipoDocumento}
+          className="mt-3 text-xs font-semibold text-[#97003f] underline underline-offset-2 hover:text-[#7b0034]"
+        >
+          {ehCpf ? 'Visitante nao tem CPF? Usar RG' : 'Visitante tem CPF? Voltar para CPF'}
+        </button>
       </div>
 
       {avisoAutopreenchimento ? (
@@ -332,4 +354,3 @@ export function EntradaForm({
     </form>
   )
 }
-

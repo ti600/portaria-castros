@@ -75,6 +75,7 @@ export function montarPayloadEntrada({
     operador_entrada_email: usuario?.email || null,
     operador_entrada_nome: usuario?.nome || null,
     documento: normalizarTexto(form.documento),
+    tipo_documento: form.tipoDocumento,
     telefone: normalizarTexto(form.telefone),
     contato_emergencia: normalizarTexto(form.contatoEmergencia) || null,
     empresa: normalizarTexto(form.empresa),

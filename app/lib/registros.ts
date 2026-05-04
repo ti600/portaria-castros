@@ -65,11 +65,11 @@ export async function consultarRegistros({
   return await query
 }
 
-export async function buscarHistoricoPorCpf(cpf: string) {
+export async function buscarHistoricoPorDocumento(documento: string) {
   return await supabase
     .from('registros')
-    .select('nome, documento, telefone, contato_emergencia, empresa, servico, destino, responsavel, foto_url, hora_entrada')
-    .eq('documento', cpf)
+    .select('nome, documento, tipo_documento, telefone, contato_emergencia, empresa, servico, destino, responsavel, foto_url, hora_entrada')
+    .eq('documento', documento)
     .order('hora_entrada', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -99,6 +99,7 @@ export async function registrarReentrada({
     operador_entrada_email: operadorEmail || null,
     operador_entrada_nome: operadorNome || null,
     documento: registro.documento || '',
+    tipo_documento: registro.tipo_documento || 'cpf',
     telefone: registro.telefone || '',
     contato_emergencia: registro.contato_emergencia || null,
     empresa: registro.empresa || '',

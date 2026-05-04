@@ -27,6 +27,7 @@ export type FormularioEvento = {
 }
 
 export type FormularioEntrada = {
+  tipoDocumento: 'cpf' | 'rg'
   nome: string
   documento: string
   telefone: string
@@ -61,6 +62,7 @@ export type Registro = {
   evento_lista_foto_url?: string | null
   evento_materiais?: MaterialEvento[] | null
   itens_entrada?: string | null
+  tipo_documento?: string | null
   foto_url?: string | null
   hora_entrada: string
   hora_saida?: string | null

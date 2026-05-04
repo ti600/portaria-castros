@@ -49,7 +49,7 @@ import {
   Usuario,
 } from '../lib/registros-types'
 import {
-  buscarHistoricoPorCpf as buscarHistoricoPorCpfService,
+  buscarHistoricoPorDocumento as buscarHistoricoPorDocumentoService,
   carregarDentro as carregarDentroService,
   carregarSaidos as carregarSaidosService,
   consultarRegistros as consultarRegistrosService,
@@ -61,6 +61,7 @@ import { identificarReentradasMesmoDia, obterSituacaoRegistro } from '../lib/sta
 import { supabase } from '../lib/supabase'
 
 const formularioInicial: FormularioEntrada = {
+  tipoDocumento: 'cpf',
   nome: '',
   documento: '',
   telefone: '',
@@ -72,6 +73,12 @@ const formularioInicial: FormularioEntrada = {
   entradaEvento: '',
   eventoNome: '',
   itensEntrada: '',
+}
+
+function formatarDocumento(documento?: string | null, tipoDocumento?: string | null) {
+  if (!documento) return ''
+  if (tipoDocumento === 'rg') return `RG ${documento}`
+  return formatarCpf(documento) || documento
 }
 
 function criarMaterialEvento(): MaterialEvento {
@@ -340,6 +347,7 @@ export default function Porteiro() {
       'Informe um nome valido',
       'CPF invalido',
       'CPF obrigatorio',
+      'RG invalido',
       'Telefone obrigatorio',
       'Servico e obrigatorio',
       'Destino e obrigatorio',
@@ -360,27 +368,46 @@ export default function Porteiro() {
     [consultaRegistrosFiltrados, consultaSelecionados]
   )
 
-  const formularioLiberado = form.documento.trim().length === 11 && validarCPF(form.documento)
-  const cpfCompletoInvalido = form.documento.trim().length === 11 && !validarCPF(form.documento)
+  const formularioLiberado = form.tipoDocumento === 'cpf'
+    ? form.documento.trim().length === 11 && validarCPF(form.documento)
+    : form.documento.trim().length >= 5
+  const cpfCompletoInvalido = form.tipoDocumento === 'cpf' && form.documento.trim().length === 11 && !validarCPF(form.documento)
 
   function alterarCampo(campo: keyof FormularioEntrada, valor: string) {
     const proximoValor =
       campo === 'nome'
         ? limparNome(valor)
         : campo === 'documento'
-          ? limparNumero(valor).slice(0, 11)
-          : campo === 'telefone'
+          ? form.tipoDocumento === 'cpf'
+            ? limparNumero(valor).slice(0, 11)
+            : valor.toUpperCase().slice(0, 20)
+          : campo === 'telefone' || campo === 'contatoEmergencia'
             ? limparNumero(valor)
             : valor
 
     if (campo === 'documento') {
       setAvisoAutopreenchimento('')
-      if (limparNumero(valor).length < 11) {
+      if (form.tipoDocumento === 'cpf' && limparNumero(valor).length < 11) {
+        setErro('')
+      } else if (form.tipoDocumento === 'rg' && valor.length < 5) {
         setErro('')
       }
     }
 
     setForm((atual) => ({ ...atual, [campo]: proximoValor }))
+  }
+
+  function alternarTipoDocumento() {
+    const novoTipo = form.tipoDocumento === 'cpf' ? 'rg' : 'cpf'
+    revogarPreviewTemporario(fotoPreviewRef.current)
+    setFoto(null)
+    setFotoPreview('')
+    fotoPreviewRef.current = ''
+    setForm({ ...formularioInicial, tipoDocumento: novoTipo })
+    setAvisoAutopreenchimento('')
+    ultimoCpfConsultadoRef.current = ''
+    resetarEvento()
+    setErro('')
   }
 
   function limparFoto() {
@@ -391,9 +418,7 @@ export default function Porteiro() {
     fotoPreviewRef.current = ''
   }
 
-  // CORRECAO 1: removido fotoPreview das dependencias — agora usa fotoPreviewRef
-  // para revogar sem recriar a funcao a cada troca de foto
-  const limparFormularioPorCpf = useCallback((cpf: string) => {
+  const limparFormularioPorDocumento = useCallback((doc: string, tipo: 'cpf' | 'rg') => {
     revogarPreviewTemporario(fotoPreviewRef.current)
 
     setFoto(null)
@@ -401,20 +426,22 @@ export default function Porteiro() {
     fotoPreviewRef.current = ''
     setForm({
       ...formularioInicial,
-      documento: cpf,
+      tipoDocumento: tipo,
+      documento: doc,
     })
     resetarEvento()
   }, [resetarEvento])
 
-  const aplicarHistoricoPorCpf = useCallback((registro: Registro, cpf: string) => {
+  const aplicarHistoricoPorDocumento = useCallback((registro: Registro, doc: string, tipo: 'cpf' | 'rg') => {
     revogarPreviewTemporario(fotoPreviewRef.current)
 
     setFoto(null)
     setFotoPreview(registro.foto_url || '')
     fotoPreviewRef.current = registro.foto_url || ''
     setForm({
+      tipoDocumento: tipo,
       nome: registro.nome || '',
-      documento: cpf,
+      documento: doc,
       telefone: registro.telefone || '',
       contatoEmergencia: registro.contato_emergencia || '',
       empresa: registro.empresa || '',
@@ -426,42 +453,54 @@ export default function Porteiro() {
       itensEntrada: '',
     })
     resetarEvento()
-    setAvisoAutopreenchimento('Dados encontrados pelo CPF e preenchidos automaticamente, incluindo a foto do ultimo registro.')
+    setAvisoAutopreenchimento(`Dados encontrados pelo ${tipo.toUpperCase()} e preenchidos automaticamente, incluindo a foto do ultimo registro.`)
   }, [resetarEvento])
 
-  const buscarHistoricoPorCpf = useCallback(async (cpf: string) => {
-    const { data, error } = await buscarHistoricoPorCpfService(cpf)
+  const buscarHistoricoParaDocumento = useCallback(async (doc: string, tipo: 'cpf' | 'rg') => {
+    const { data, error } = await buscarHistoricoPorDocumentoService(doc)
+
+    // Se o usuario digitou mais enquanto a busca estava em andamento, descarta o resultado antigo
+    if (ultimoCpfConsultadoRef.current !== doc) return
 
     if (error) {
-      setErro('Nao foi possivel consultar o historico pelo CPF.')
+      setErro(`Nao foi possivel consultar o historico pelo ${tipo.toUpperCase()}.`)
       return
     }
 
     if (!data) {
-      limparFormularioPorCpf(cpf)
-      setAvisoAutopreenchimento('CPF nao encontrado no historico. Continue com o preenchimento manual.')
+      limparFormularioPorDocumento(doc, tipo)
+      setAvisoAutopreenchimento(`${tipo.toUpperCase()} nao encontrado no historico. Continue com o preenchimento manual.`)
       return
     }
 
-    aplicarHistoricoPorCpf(data as Registro, cpf)
-  }, [aplicarHistoricoPorCpf, limparFormularioPorCpf])
+    aplicarHistoricoPorDocumento(data as Registro, doc, tipo)
+  }, [aplicarHistoricoPorDocumento, limparFormularioPorDocumento])
 
   useEffect(() => {
-    const cpf = form.documento.trim()
+    const doc = form.documento.trim()
+    const tipo = form.tipoDocumento
 
-    if (cpf.length !== 11 || !validarCPF(cpf)) {
-      setAvisoAutopreenchimento('')
-      ultimoCpfConsultadoRef.current = cpf
+    if (tipo === 'cpf') {
+      if (doc.length !== 11 || !validarCPF(doc)) {
+        setAvisoAutopreenchimento('')
+        ultimoCpfConsultadoRef.current = doc
+        return
+      }
+    } else {
+      if (doc.length < 5) {
+        setAvisoAutopreenchimento('')
+        ultimoCpfConsultadoRef.current = doc
+        return
+      }
+    }
+
+    if (ultimoCpfConsultadoRef.current === doc) {
       return
     }
 
-    if (ultimoCpfConsultadoRef.current === cpf) {
-      return
-    }
-
-    ultimoCpfConsultadoRef.current = cpf
-    void buscarHistoricoPorCpf(cpf)
-  }, [buscarHistoricoPorCpf, form.documento])
+    ultimoCpfConsultadoRef.current = doc
+    void buscarHistoricoParaDocumento(doc, tipo)
+  }, [buscarHistoricoParaDocumento, form.documento, form.tipoDocumento])
 
   function fecharCamera() {
     streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -599,9 +638,16 @@ export default function Porteiro() {
       return false
     }
 
-    if (form.documento.trim().length !== 11 || !validarCPF(form.documento)) {
-      setErro('CPF invalido. Verifique os 11 digitos informados.')
-      return false
+    if (form.tipoDocumento === 'cpf') {
+      if (form.documento.trim().length !== 11 || !validarCPF(form.documento)) {
+        setErro('CPF invalido. Verifique os 11 digitos informados.')
+        return false
+      }
+    } else {
+      if (form.documento.trim().length < 5) {
+        setErro('RG invalido. Informe ao menos 5 caracteres.')
+        return false
+      }
     }
 
     if (form.telefone.trim().length !== 11) {
@@ -1040,6 +1086,7 @@ export default function Porteiro() {
               salvandoEntrada={salvandoEntrada}
               onSubmit={solicitarConfirmacaoEntrada}
               onAlterarCampo={alterarCampo}
+              onAlternarTipoDocumento={alternarTipoDocumento}
               onMarcarEventoNao={() => {
                 setForm((atual) => ({
                   ...atual,
@@ -1090,7 +1137,7 @@ export default function Porteiro() {
                   <input
                     value={buscaDentro}
                     onChange={(event) => setBuscaDentro(event.target.value)}
-                    placeholder="Pesquisar nome ou CPF"
+                    placeholder="Pesquisar nome ou documento"
                     className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs"
                   />
                 </div>
@@ -1141,7 +1188,7 @@ export default function Porteiro() {
                       <p className="break-words font-bold">{registro.nome}</p>
                       {registro.documento && (
                         <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55]">
-                          {formatarCpf(registro.documento)}
+                          {formatarDocumento(registro.documento, registro.tipo_documento)}
                         </span>
                       )}
                     </div>
@@ -1220,7 +1267,7 @@ export default function Porteiro() {
                       setBuscaSaidos(valor)
                       void carregarSaidos(valor)
                     }}
-                    placeholder="Pesquisar nome ou CPF"
+                    placeholder="Pesquisar nome ou documento"
                     className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs"
                   />
                 </div>
@@ -1270,7 +1317,7 @@ export default function Porteiro() {
                         <p className="break-words font-bold">{registro.nome}</p>
                         {registro.documento && (
                           <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55]">
-                            {formatarCpf(registro.documento)}
+                            {formatarDocumento(registro.documento, registro.tipo_documento)}
                           </span>
                         )}
                       </div>
@@ -1308,7 +1355,7 @@ export default function Porteiro() {
                   <input
                     value={buscaHospedesDentro}
                     onChange={(event) => setBuscaHospedesDentro(event.target.value)}
-                    placeholder="Pesquisar nome ou CPF"
+                    placeholder="Pesquisar nome ou documento"
                     className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs"
                   />
                 </div>
@@ -1358,7 +1405,7 @@ export default function Porteiro() {
                         <p className="break-words font-bold">{registro.nome}</p>
                         {registro.documento && (
                           <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55]">
-                            {formatarCpf(registro.documento)}
+                            {formatarDocumento(registro.documento, registro.tipo_documento)}
                           </span>
                         )}
                       </div>
@@ -1467,7 +1514,7 @@ export default function Porteiro() {
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-                    Pesquisar nome ou CPF
+                    Pesquisar nome ou documento
                   </span>
                   <input
                     value={consultaPesquisa}
@@ -1562,7 +1609,7 @@ export default function Porteiro() {
                     <th className="px-4 py-3">Sel.</th>
                     <th className="px-4 py-3">Foto</th>
                     <th className="px-4 py-3">Nome</th>
-                    <th className="px-4 py-3">CPF</th>
+                    <th className="px-4 py-3">Documento</th>
                     <th className="px-4 py-3">Empresa</th>
                     <th className="px-4 py-3">Servico</th>
                     <th className="px-4 py-3">Destino</th>
@@ -1631,7 +1678,16 @@ export default function Porteiro() {
                           </button>
                         </td>
                         <td className="px-4 py-3 font-semibold">{texto(registro.nome)}</td>
-                        <td className="px-4 py-3 text-[#6f4358]">{formatarCpf(registro.documento) || '-'}</td>
+                        <td className="px-4 py-3 text-[#6f4358]">
+                          {registro.documento ? (
+                            <div>
+                              {registro.tipo_documento === 'rg' && (
+                                <span className="mb-0.5 block text-[10px] font-bold uppercase text-[#8a2d55]">RG</span>
+                              )}
+                              <span>{registro.tipo_documento === 'rg' ? registro.documento : formatarCpf(registro.documento)}</span>
+                            </div>
+                          ) : '-'}
+                        </td>
                         <td className="px-4 py-3 text-[#6f4358]">{texto(registro.empresa)}</td>
                         <td className="px-4 py-3 text-[#6f4358]">{texto(registro.servico)}</td>
                         <td className="px-4 py-3 text-[#6f4358]">{texto(registro.destino)}</td>
@@ -1750,7 +1806,7 @@ export default function Porteiro() {
 
             <div className="mt-4 rounded-lg bg-[#fffafb] p-4 text-sm text-[#4a2636]">
               <p><strong>Nome:</strong> {form.nome || '-'}</p>
-              <p className="mt-2"><strong>CPF:</strong> {formatarCpf(form.documento) || '-'}</p>
+              <p className="mt-2"><strong>Documento ({form.tipoDocumento.toUpperCase()}):</strong> {formatarDocumento(form.documento, form.tipoDocumento) || '-'}</p>
               <p className="mt-2"><strong>Telefone:</strong> {formatarTelefone(form.telefone) || '-'}</p>
               <p className="mt-2"><strong>Servico:</strong> {form.servico || '-'}</p>
               <p className="mt-2"><strong>Destino:</strong> {form.destino || '-'}</p>
