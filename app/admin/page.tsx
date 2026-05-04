@@ -2,12 +2,17 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { LogsSection } from '../components/admin/LogsSection'
+import { RegistrosSection } from '../components/admin/RegistrosSection'
+import { BloqueiosSection } from '../components/admin/BloqueiosSection'
 import { BrandMark } from '../components/BrandMark'
 import { ImageLightbox } from '../components/ImageLightbox'
 import { lerUsuarioLogado, limparSessaoUsuario } from '../lib/auth'
-import { formatarAcaoLog, listarLogs, LogSistema, opcoesAcaoLog, registrarLog } from '../lib/logs'
+import { fimDoDiaLocalEmIso, inicioDoDiaLocalEmIso } from '../lib/date-range'
+import { limparNome } from '../lib/formatters'
+import { formatarAcaoLog, listarLogs, LogSistema, registrarLog } from '../lib/logs'
 import { exportarRelatorioExcel, exportarRelatorioPdf } from '../lib/reports'
-import { identificarReentradasMesmoDia, obterSituacaoRegistro } from '../lib/status'
+import { identificarReentradasMesmoDia } from '../lib/status'
 import { supabase } from '../lib/supabase'
 
 type Perfil = 'admin' | 'porteiro'
@@ -60,46 +65,8 @@ const usuarioInicial: NovoUsuario = {
   perfil: 'porteiro',
 }
 
-function formatarData(valor?: string | null) {
-  if (!valor) return '-'
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date(valor))
-}
-
-function texto(valor?: string | null) {
-  return valor && valor.trim() ? valor : '-'
-}
-
-function limparNome(valor: string) {
-  return valor.replace(/[^\p{L}\s'-]/gu, '').replace(/\s{2,}/g, ' ')
-}
-
-function limparNumero(valor: string) {
-  return valor.replace(/\D/g, '')
-}
-
-function formatarCpf(valor?: string | null) {
-  const numeros = limparNumero(valor || '').slice(0, 11)
-
-  return numeros
-    .replace(/^(\d{3})(\d)/, '$1.$2')
-    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
-    .replace(/\.(\d{3})(\d)/, '.$1-$2')
-}
-
-function formatarTelefone(valor?: string | null) {
-  const numeros = limparNumero(valor || '').slice(0, 11)
-
-  if (numeros.length <= 2) return numeros
-  if (numeros.length <= 7) return `(${numeros.slice(0, 2)}) ${numeros.slice(2)}`
-
-  return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7)}`
-}
-
 export default function Admin() {
-  const [aba, setAba] = useState<'registros' | 'usuarios' | 'logs'>('registros')
+  const [aba, setAba] = useState<'registros' | 'usuarios' | 'logs' | 'bloqueios'>('registros')
   const [admin, setAdmin] = useState<Usuario | null>(null)
   const [registros, setRegistros] = useState<Registro[]>([])
   const [dentroAgora, setDentroAgora] = useState(0)
@@ -150,11 +117,11 @@ export default function Admin() {
     let query = supabase.from('registros').select('*').order('created_at', { ascending: false })
 
     if (dataInicio) {
-      query = query.gte('hora_entrada', `${dataInicio}T00:00:00`)
+      query = query.gte('hora_entrada', inicioDoDiaLocalEmIso(dataInicio))
     }
 
     if (dataFim) {
-      query = query.lte('hora_entrada', `${dataFim}T23:59:59`)
+      query = query.lte('hora_entrada', fimDoDiaLocalEmIso(dataFim))
     }
 
     if (pesquisaRegistro.trim()) {
@@ -283,6 +250,16 @@ export default function Admin() {
 
     return `${total} ${total === 1 ? 'registro localizado' : 'registros localizados'} em ${descricaoAcao.toLowerCase()}.`
   }, [acaoLog, avisoLogs, logs])
+
+  function limparFiltrosLogs() {
+    setDataInicioLog('')
+    setDataFimLog('')
+    setPesquisaLog('')
+    setAcaoLog('todos')
+    setAvisoLogs('')
+    setLogs([])
+    setLogsConsultaExecutada(false)
+  }
 
   async function criarUsuario(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -607,6 +584,17 @@ export default function Admin() {
           </button>
           <button
             type="button"
+            onClick={() => setAba('bloqueios')}
+            className={`rounded-md px-4 py-2 text-sm font-bold transition ${
+              aba === 'bloqueios'
+                ? 'bg-[#97003f] text-white'
+                : 'text-[#6f4358] hover:bg-[#fff0f6]'
+            }`}
+          >
+            Bloqueios
+          </button>
+          <button
+            type="button"
             onClick={() => setAba('logs')}
             className={`rounded-md px-4 py-2 text-sm font-bold transition ${
               aba === 'logs'
@@ -619,223 +607,21 @@ export default function Admin() {
         </div>
 
         {aba === 'registros' && (
-          <section className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
-            <form
-              onSubmit={aplicarFiltrosRegistros}
-              className="flex flex-col gap-4 border-b border-[#f0e3e8] px-4 py-4 sm:px-5"
-            >
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h2 className="text-lg font-bold">Registros de entrada</h2>
-                  <p className="mt-1 text-sm text-[#6f4358]">
-                    Consulte por periodo e exporte apenas o recorte necessario.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={exportarExcel}
-                    className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-                  >
-                    Exportar Excel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={exportarPdf}
-                    className="rounded-md bg-[#97003f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#7b0034]"
-                  >
-                    Exportar PDF
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 rounded-lg bg-[#fffafb] p-3 lg:grid-cols-[180px_180px_minmax(220px,1fr)_auto]">
-                <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Data inicial</span>
-                  <input
-                    type="date"
-                    value={dataInicio}
-                    onChange={(event) => setDataInicio(event.target.value)}
-                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Data final</span>
-                  <input
-                    type="date"
-                    value={dataFim}
-                    onChange={(event) => setDataFim(event.target.value)}
-                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-                    Pesquisar nome ou CPF
-                  </span>
-                  <input
-                    value={pesquisaRegistro}
-                    onChange={(event) => setPesquisaRegistro(event.target.value)}
-                    placeholder="Ex.: Marcelo ou 123456789"
-                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                  />
-                </label>
-
-                <button
-                  type="submit"
-                  className="self-end rounded-md border border-[#d7b8c7] bg-white px-4 py-2.5 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-                >
-                  Aplicar filtro
-                </button>
-              </div>
-            </form>
-
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1520px] text-left text-sm">
-                <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
-                  <tr>
-                    <th className="px-4 py-3">Foto</th>
-                    <th className="px-4 py-3">Nome</th>
-                    <th className="px-4 py-3">CPF</th>
-                    <th className="px-4 py-3">Telefone</th>
-                    <th className="px-4 py-3">Empresa</th>
-                    <th className="px-4 py-3">Servico</th>
-                    <th className="px-4 py-3">Destino</th>
-                    <th className="px-4 py-3">Responsavel</th>
-                    <th className="px-4 py-3">Operador da entrada</th>
-                    <th className="px-4 py-3">Evento / Itens</th>
-                    <th className="px-4 py-3">Anexo</th>
-                    <th className="px-4 py-3">Entrada</th>
-                    <th className="px-4 py-3">Saida</th>
-                    <th className="px-4 py-3">Situacao</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#f3e8ed]">
-                  {registros.map((registro) => (
-                    <tr key={registro.id} className="hover:bg-[#fffafb]">
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            registro.foto_url
-                              ? setImagemAberta({
-                                  alt: `Foto de ${registro.nome}`,
-                                  src: registro.foto_url,
-                                })
-                              : undefined
-                          }
-                          className="size-12 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
-                        >
-                          {registro.foto_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={registro.foto_url}
-                              alt={`Foto de ${registro.nome}`}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="grid h-full place-items-center text-sm font-black text-[#97003f]">
-                              {registro.nome?.charAt(0).toUpperCase() || '?'}
-                            </div>
-                          )}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 font-semibold">{texto(registro.nome)}</td>
-                      <td className="px-4 py-3 text-[#6f4358]">{formatarCpf(registro.documento) || '-'}</td>
-                      <td className="px-4 py-3 text-[#6f4358]">{formatarTelefone(registro.telefone) || '-'}</td>
-                      <td className="px-4 py-3 text-[#6f4358]">{texto(registro.empresa)}</td>
-                      <td className="px-4 py-3 text-[#6f4358]">{texto(registro.servico)}</td>
-                      <td className="px-4 py-3 text-[#6f4358]">{texto(registro.destino)}</td>
-                      <td className="px-4 py-3 text-[#6f4358]">{texto(registro.responsavel)}</td>
-                      <td className="px-4 py-3 text-[#6f4358]">
-                        <div className="space-y-1">
-                          <p>{texto(registro.operador_entrada_nome)}</p>
-                          <p className="text-xs">{texto(registro.operador_entrada_email)}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-[#6f4358]">
-                        {registro.entrada_evento ? (
-                          <div className="space-y-1">
-                            <p className="font-semibold text-[#4a2636]">{texto(registro.evento_nome)}</p>
-                            <p className="text-xs leading-5">{texto(registro.itens_entrada)}</p>
-                          </div>
-                        ) : (
-                            '-'
-                          )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {registro.evento_lista_foto_url ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setImagemAberta({
-                                alt: `Anexo do evento de ${registro.nome}`,
-                                src: registro.evento_lista_foto_url || '',
-                              })
-                            }
-                            className="size-12 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={registro.evento_lista_foto_url}
-                              alt={`Anexo do evento de ${registro.nome}`}
-                              className="h-full w-full object-cover"
-                            />
-                          </button>
-                        ) : (
-                          <span className="text-[#6f4358]">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-[#6f4358]">{formatarData(registro.hora_entrada)}</td>
-                      <td className="px-4 py-3">
-                        {registro.hora_saida ? (
-                          <span className="text-[#6f4358]">{formatarData(registro.hora_saida)}</span>
-                        ) : (
-                          <span className="rounded-full bg-[#ffe6f0] px-3 py-1 text-xs font-bold text-[#97003f]">
-                            Dentro
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {(() => {
-                          const situacao = obterSituacaoRegistro(registro, idsReentrada)
-                          const estilo =
-                            situacao === 'Dentro'
-                              ? 'bg-[#ffe6f0] text-[#97003f]'
-                              : situacao === 'Reentrada'
-                                ? 'bg-[#fff5d6] text-[#9a6800]'
-                                : 'bg-[#f5eef2] text-[#6f4358]'
-
-                          return (
-                            <span className={`rounded-full px-3 py-1 text-xs font-bold ${estilo}`}>
-                              {situacao}
-                            </span>
-                          )
-                        })()}
-                      </td>
-                    </tr>
-                  ))}
-                  {!registros.length && !dataInicio && !dataFim && !pesquisaRegistro.trim() && (
-                    <tr>
-                      <td colSpan={14} className="px-4 py-8 text-center text-[#8a2d55]">
-                        Preencha uma data ou pesquisa para carregar os registros.
-                      </td>
-                    </tr>
-                  )}
-                  {registros.length === 0 && (dataInicio || dataFim || pesquisaRegistro.trim()) && (
-                    <tr>
-                      <td colSpan={14} className="px-4 py-8 text-center text-[#8a2d55]">
-                        Nenhum registro encontrado.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          <RegistrosSection
+            dataInicio={dataInicio}
+            dataFim={dataFim}
+            pesquisaRegistro={pesquisaRegistro}
+            registros={registros}
+            idsReentrada={idsReentrada}
+            onSubmit={aplicarFiltrosRegistros}
+            onDataInicioChange={setDataInicio}
+            onDataFimChange={setDataFim}
+            onPesquisaRegistroChange={setPesquisaRegistro}
+            onExportarExcel={exportarExcel}
+            onExportarPdf={exportarPdf}
+            onAbrirImagem={setImagemAberta}
+          />
         )}
-
         {aba === 'usuarios' && (
           <section className="grid grid-cols-1 gap-5 lg:grid-cols-[0.82fr_1.18fr]">
             <form
@@ -995,184 +781,29 @@ export default function Admin() {
         )}
 
         {aba === 'logs' && (
-          <section className="rounded-lg border border-[#eadde3] bg-white shadow-sm">
-            <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="max-w-2xl">
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8a2d55]">Auditoria</p>
-                  <h2 className="mt-1 text-lg font-bold">Logs do sistema</h2>
-                  <p className="mt-1 text-sm text-[#6f4358]">
-                    Consulte o historico operacional, administrativo e de exportacoes realizadas no sistema.
-                  </p>
-                </div>
+          <LogsSection
+            acaoLog={acaoLog}
+            avisoLogs={avisoLogs}
+            carregandoLogs={carregandoLogs}
+            dataFimLog={dataFimLog}
+            dataInicioLog={dataInicioLog}
+            filtrosLogsAtivos={filtrosLogsAtivos}
+            logs={logs}
+            logsConsultaExecutada={logsConsultaExecutada}
+            pesquisaLog={pesquisaLog}
+            resumoLogs={resumoLogs}
+            onAcaoLogChange={setAcaoLog}
+            onConsultarLogs={carregarLogs}
+            onDataFimLogChange={setDataFimLog}
+            onDataInicioLogChange={setDataInicioLog}
+            onLimparFiltros={limparFiltrosLogs}
+            onPesquisaLogChange={setPesquisaLog}
+          />
+        )}
 
-                <div className="flex flex-wrap gap-2 lg:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDataInicioLog('')
-                      setDataFimLog('')
-                      setPesquisaLog('')
-                      setAcaoLog('todos')
-                      setAvisoLogs('')
-                      setLogs([])
-                      setLogsConsultaExecutada(false)
-                    }}
-                    className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2.5 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-                  >
-                    Limpar filtros
-                  </button>
-                  <button
-                    type="button"
-                    onClick={carregarLogs}
-                    className="rounded-md bg-[#97003f] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#7b0034]"
-                  >
-                    {carregandoLogs ? 'Consultando...' : 'Consultar logs'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {avisoLogs && (
-              <div className="border-b border-[#f0e3e8] bg-[#fff0f6] px-4 py-3 text-sm font-medium text-[#97003f] sm:px-5">
-                {avisoLogs}
-              </div>
-            )}
-
-            <div className="border-b border-[#f0e3e8] bg-[#fffafb] px-4 py-4 sm:px-5">
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[180px_180px_220px_minmax(0,1fr)]">
-                <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Data inicial</span>
-                  <input
-                    type="date"
-                    value={dataInicioLog}
-                    onChange={(event) => setDataInicioLog(event.target.value)}
-                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Data final</span>
-                  <input
-                    type="date"
-                    value={dataFimLog}
-                    onChange={(event) => setDataFimLog(event.target.value)}
-                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Tipo de acao</span>
-                  <select
-                    value={acaoLog}
-                    onChange={(event) => setAcaoLog(event.target.value as typeof acaoLog)}
-                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                  >
-                    <option value="todos">Todas as acoes</option>
-                    {opcoesAcaoLog.map((opcao) => (
-                      <option key={opcao.value} value={opcao.value}>
-                        {opcao.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Pesquisar nos logs</span>
-                  <input
-                    value={pesquisaLog}
-                    onChange={(event) => setPesquisaLog(event.target.value)}
-                    placeholder="Operador, e-mail, acao ou detalhe"
-                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                  />
-                </label>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                  <span className="rounded-full border border-[#eadde3] bg-white px-3 py-1 text-[#8a2d55]">
-                    Exibicao maxima de 100 registros por consulta
-                  </span>
-                  {filtrosLogsAtivos ? (
-                    <span className="rounded-full bg-[#fff0f6] px-3 py-1 text-[#97003f]">
-                      Filtros ativos
-                    </span>
-                  ) : null}
-                </div>
-                <p className="text-xs text-[#8a2d55]">
-                  Use os filtros para recortar melhor a auditoria.
-                </p>
-              </div>
-            </div>
-
-            {!avisoLogs && logsConsultaExecutada && (
-              <div className="border-b border-[#f0e3e8] px-4 py-3 text-sm font-medium text-[#8a2d55] sm:px-5">
-                {resumoLogs}
-              </div>
-            )}
-
-            <div className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[1040px] text-left text-sm">
-                  <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
-                    <tr>
-                      <th className="px-4 py-3">Data</th>
-                      <th className="px-4 py-3">Acao</th>
-                      <th className="px-4 py-3">Operador</th>
-                      <th className="px-4 py-3">E-mail</th>
-                      <th className="px-4 py-3">Detalhes</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#f3e8ed]">
-                    {logs.map((log) => (
-                      <tr key={log.id} className="hover:bg-[#fffafb]">
-                        <td className="px-4 py-3 text-[#6f4358]">{formatarData(log.created_at)}</td>
-                        <td className="px-4 py-3">
-                          <span className="rounded-full bg-[#fff0f6] px-3 py-1 text-xs font-bold text-[#97003f]">
-                            {formatarAcaoLog(log.acao)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 font-semibold text-[#2b1420]">{texto(log.usuario_nome)}</td>
-                        <td className="px-4 py-3 text-[#6f4358]">{texto(log.usuario_email)}</td>
-                        <td className="px-4 py-3 text-[#6f4358]">{texto(log.detalhes)}</td>
-                      </tr>
-                    ))}
-                    {!logs.length && !avisoLogs && logsConsultaExecutada && (
-                      <tr>
-                        <td colSpan={5} className="px-0 py-0">
-                          <div className="grid place-items-center px-6 py-12 text-center">
-                            <div className="max-w-md">
-                              <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#8a2d55]">
-                                Nenhum resultado
-                              </p>
-                              <p className="mt-2 text-sm text-[#6f4358]">
-                                Nenhum log encontrado para os filtros informados. Ajuste o periodo, a acao ou a pesquisa textual e consulte novamente.
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                    {!logs.length && !avisoLogs && !logsConsultaExecutada && (
-                      <tr>
-                        <td colSpan={5} className="px-0 py-0">
-                          <div className="grid place-items-center px-6 py-14 text-center">
-                            <div className="max-w-lg">
-                              <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#8a2d55]">
-                                Auditoria pronta para consulta
-                              </p>
-                              <p className="mt-2 text-sm text-[#6f4358]">
-                                Defina um periodo, refine por tipo de acao se quiser, e clique em consultar logs para carregar somente o recorte desejado.
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+        {aba === 'bloqueios' && (
+          <section className="rounded-lg border border-[#eadde3] bg-white p-6 shadow-sm">
+            <BloqueiosSection />
           </section>
         )}
       </div>

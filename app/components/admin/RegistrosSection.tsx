@@ -1,0 +1,293 @@
+'use client'
+
+import { FormEvent } from 'react'
+import { formatarCpf, formatarData, formatarTelefone, texto } from '../../lib/formatters'
+import { obterSituacaoRegistro } from '../../lib/status'
+
+type RegistroAdmin = {
+  id: string
+  nome: string
+  operador_entrada_email?: string | null
+  operador_entrada_nome?: string | null
+  documento?: string | null
+  telefone?: string | null
+  empresa?: string | null
+  servico?: string | null
+  destino?: string | null
+  responsavel?: string | null
+  entrada_evento?: boolean | null
+  evento_lista_foto_url?: string | null
+  evento_nome?: string | null
+  itens_entrada?: string | null
+  foto_url?: string | null
+  hora_entrada?: string | null
+  hora_saida?: string | null
+}
+
+type RegistrosSectionProps = {
+  dataInicio: string
+  dataFim: string
+  pesquisaRegistro: string
+  registros: RegistroAdmin[]
+  idsReentrada: Set<string>
+  onSubmit: (event?: FormEvent<HTMLFormElement>) => void
+  onDataInicioChange: (valor: string) => void
+  onDataFimChange: (valor: string) => void
+  onPesquisaRegistroChange: (valor: string) => void
+  onExportarExcel: () => void
+  onExportarPdf: () => void
+  onAbrirImagem: (imagem: { alt: string; src: string }) => void
+}
+
+function ehPdfArquivo(valor?: string | null) {
+  return (valor || '').toLowerCase().includes('.pdf')
+}
+
+export function RegistrosSection({
+  dataInicio,
+  dataFim,
+  pesquisaRegistro,
+  registros,
+  idsReentrada,
+  onSubmit,
+  onDataInicioChange,
+  onDataFimChange,
+  onPesquisaRegistroChange,
+  onExportarExcel,
+  onExportarPdf,
+  onAbrirImagem,
+}: RegistrosSectionProps) {
+  return (
+    <section className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
+      <form
+        onSubmit={onSubmit}
+        className="flex flex-col gap-4 border-b border-[#f0e3e8] px-4 py-4 sm:px-5"
+      >
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-lg font-bold">Registros de entrada</h2>
+            <p className="mt-1 text-sm text-[#6f4358]">
+              Consulte por periodo e exporte apenas o recorte necessario.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onExportarExcel}
+              className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+            >
+              Exportar Excel
+            </button>
+            <button
+              type="button"
+              onClick={onExportarPdf}
+              className="rounded-md bg-[#97003f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#7b0034]"
+            >
+              Exportar PDF
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 rounded-lg bg-[#fffafb] p-3 lg:grid-cols-[180px_180px_minmax(220px,1fr)_auto]">
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Data inicial</span>
+            <input
+              type="date"
+              value={dataInicio}
+              onChange={(event) => onDataInicioChange(event.target.value)}
+              className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Data final</span>
+            <input
+              type="date"
+              value={dataFim}
+              onChange={(event) => onDataFimChange(event.target.value)}
+              className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
+              Pesquisar nome ou CPF
+            </span>
+            <input
+              value={pesquisaRegistro}
+              onChange={(event) => onPesquisaRegistroChange(event.target.value)}
+              placeholder="Ex.: Marcelo ou 123456789"
+              className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+            />
+          </label>
+
+          <button
+            type="submit"
+            className="self-end rounded-md border border-[#d7b8c7] bg-white px-4 py-2.5 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+          >
+            Aplicar filtro
+          </button>
+        </div>
+      </form>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1520px] text-left text-sm">
+          <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
+            <tr>
+              <th className="px-4 py-3">Foto</th>
+              <th className="px-4 py-3">Nome</th>
+              <th className="px-4 py-3">CPF</th>
+              <th className="px-4 py-3">Telefone</th>
+              <th className="px-4 py-3">Empresa</th>
+              <th className="px-4 py-3">Servico</th>
+              <th className="px-4 py-3">Destino</th>
+              <th className="px-4 py-3">Responsavel</th>
+              <th className="px-4 py-3">Operador da entrada</th>
+              <th className="px-4 py-3">Evento / Itens</th>
+              <th className="px-4 py-3">Anexo</th>
+              <th className="px-4 py-3">Entrada</th>
+              <th className="px-4 py-3">Saida</th>
+              <th className="px-4 py-3">Situacao</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#f3e8ed]">
+            {registros.map((registro) => (
+              <tr key={registro.id} className="hover:bg-[#fffafb]">
+                <td className="px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      registro.foto_url
+                        ? onAbrirImagem({
+                            alt: `Foto de ${registro.nome}`,
+                            src: registro.foto_url,
+                          })
+                        : undefined
+                    }
+                    className="size-12 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
+                  >
+                    {registro.foto_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={registro.foto_url}
+                        alt={`Foto de ${registro.nome}`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="grid h-full place-items-center text-sm font-black text-[#97003f]">
+                        {registro.nome?.charAt(0).toUpperCase() || '?'}
+                      </div>
+                    )}
+                  </button>
+                </td>
+                <td className="px-4 py-3 font-semibold">{texto(registro.nome)}</td>
+                <td className="px-4 py-3 text-[#6f4358]">{formatarCpf(registro.documento) || '-'}</td>
+                <td className="px-4 py-3 text-[#6f4358]">{formatarTelefone(registro.telefone) || '-'}</td>
+                <td className="px-4 py-3 text-[#6f4358]">{texto(registro.empresa)}</td>
+                <td className="px-4 py-3 text-[#6f4358]">{texto(registro.servico)}</td>
+                <td className="px-4 py-3 text-[#6f4358]">{texto(registro.destino)}</td>
+                <td className="px-4 py-3 text-[#6f4358]">{texto(registro.responsavel)}</td>
+                <td className="px-4 py-3 text-[#6f4358]">
+                  <div className="space-y-1">
+                    <p>{texto(registro.operador_entrada_nome)}</p>
+                    <p className="text-xs">{texto(registro.operador_entrada_email)}</p>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-[#6f4358]">
+                  {registro.entrada_evento ? (
+                    <div className="space-y-1">
+                      <p className="font-semibold text-[#4a2636]">{texto(registro.evento_nome)}</p>
+                      <p className="text-xs leading-5">{texto(registro.itens_entrada)}</p>
+                    </div>
+                  ) : (
+                    '-'
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {registro.evento_lista_foto_url ? (
+                    ehPdfArquivo(registro.evento_lista_foto_url) ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.open(
+                            registro.evento_lista_foto_url || '',
+                            '_blank',
+                            'noopener,noreferrer'
+                          )
+                        }
+                        className="grid size-12 place-items-center overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb] text-[10px] font-bold text-[#97003f]"
+                      >
+                        PDF
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onAbrirImagem({
+                            alt: `Anexo do evento de ${registro.nome}`,
+                            src: registro.evento_lista_foto_url || '',
+                          })
+                        }
+                        className="size-12 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={registro.evento_lista_foto_url}
+                          alt={`Anexo do evento de ${registro.nome}`}
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                    )
+                  ) : (
+                    <span className="text-[#6f4358]">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-[#6f4358]">{formatarData(registro.hora_entrada)}</td>
+                <td className="px-4 py-3">
+                  {registro.hora_saida ? (
+                    <span className="text-[#6f4358]">{formatarData(registro.hora_saida)}</span>
+                  ) : (
+                    <span className="rounded-full bg-[#ffe6f0] px-3 py-1 text-xs font-bold text-[#97003f]">
+                      Dentro
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {(() => {
+                    const situacao = obterSituacaoRegistro(registro, idsReentrada)
+                    const estilo =
+                      situacao === 'Dentro'
+                        ? 'bg-[#ffe6f0] text-[#97003f]'
+                        : situacao === 'Reentrada'
+                          ? 'bg-[#fff5d6] text-[#9a6800]'
+                          : 'bg-[#f5eef2] text-[#6f4358]'
+
+                    return (
+                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${estilo}`}>
+                        {situacao}
+                      </span>
+                    )
+                  })()}
+                </td>
+              </tr>
+            ))}
+            {!registros.length && !dataInicio && !dataFim && !pesquisaRegistro.trim() && (
+              <tr>
+                <td colSpan={14} className="px-4 py-8 text-center text-[#8a2d55]">
+                  Preencha uma data ou pesquisa para carregar os registros.
+                </td>
+              </tr>
+            )}
+            {registros.length === 0 && (dataInicio || dataFim || pesquisaRegistro.trim()) && (
+              <tr>
+                <td colSpan={14} className="px-4 py-8 text-center text-[#8a2d55]">
+                  Nenhum registro encontrado.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}

@@ -5,6 +5,49 @@ type BodyAtualizarSenha = {
   senha?: string
 }
 
+type ValidacaoSenha = {
+  valida: boolean
+  mensagens: string[]
+}
+
+/**
+ * Valida a força da senha baseado em critérios de segurança
+ * Requisitos:
+ * - Mínimo 8 caracteres
+ * - Pelo menos uma letra maiúscula
+ * - Pelo menos uma letra minúscula
+ * - Pelo menos um número
+ * - Pelo menos um caractere especial
+ */
+function validarForcaSenha(senha: string): ValidacaoSenha {
+  const mensagens: string[] = []
+
+  if (senha.length < 8) {
+    mensagens.push('A senha deve ter no mínimo 8 caracteres')
+  }
+
+  if (!/[A-Z]/.test(senha)) {
+    mensagens.push('A senha deve conter pelo menos uma letra maiúscula')
+  }
+
+  if (!/[a-z]/.test(senha)) {
+    mensagens.push('A senha deve conter pelo menos uma letra minúscula')
+  }
+
+  if (!/[0-9]/.test(senha)) {
+    mensagens.push('A senha deve conter pelo menos um número')
+  }
+
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(senha)) {
+    mensagens.push('A senha deve conter pelo menos um caractere especial (!@#$%^&*...)')
+  }
+
+  return {
+    valida: mensagens.length === 0,
+    mensagens,
+  }
+}
+
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
@@ -22,6 +65,15 @@ export async function PATCH(
 
   if (!id || !senha.trim()) {
     return NextResponse.json({ error: 'Informe uma nova senha para atualizar o usuario.' }, { status: 400 })
+  }
+
+  // Validar força da senha
+  const validacao = validarForcaSenha(senha)
+  if (!validacao.valida) {
+    return NextResponse.json(
+      { error: 'Senha fraca. ' + validacao.mensagens.join(' ') },
+      { status: 400 }
+    )
   }
 
   try {

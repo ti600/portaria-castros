@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { BrandMark } from './components/BrandMark'
 import { carregarPerfilAuth, salvarSessaoUsuario } from './lib/auth'
 import { supabase } from './lib/supabase'
+import { verificarUserBloqueado, registrarTentativaFalhada, limparTentativas, obterTempoRestanteBloqueio } from './lib/login-attempts'
 
 type Perfil = 'admin' | 'porteiro'
 
@@ -66,15 +67,29 @@ export default function Login() {
     setErro('')
     setCarregando(true)
 
+    const emailNormalizado = email.trim().toLowerCase()
+
+    // Verificar se o usuário está bloqueado
+    const estaBloqueado = await verificarUserBloqueado(emailNormalizado)
+    if (estaBloqueado) {
+      const tempoRestante = await obterTempoRestanteBloqueio(emailNormalizado)
+      const minutos = tempoRestante || 30
+      setCarregando(false)
+      setErro(`Muitas tentativas de login falhadas. Tente novamente em ${minutos} minuto(s).`)
+      return
+    }
+
     const {
       data: authData,
       error,
     } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
+      email: emailNormalizado,
       password: senha,
     })
 
     if (error || !authData.user) {
+      // Registrar tentativa falhada
+      await registrarTentativaFalhada(emailNormalizado)
       setCarregando(false)
       setErro('E-mail ou senha incorretos.')
       return
@@ -103,6 +118,11 @@ export default function Login() {
       await supabase.auth.signOut()
       setErro('Este usuario esta inativo. Fale com um administrador.')
       return
+    }
+
+    // Login bem-sucedido - limpar tentativas APENAS para porteiros
+    if (perfil.perfil === 'porteiro') {
+      await limparTentativas(emailNormalizado)
     }
 
     salvarSessaoUsuario(perfil)

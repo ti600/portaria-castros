@@ -1,87 +1,64 @@
 'use client'
 
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, FormEvent, MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BrandMark } from '../components/BrandMark'
 import { ImageLightbox } from '../components/ImageLightbox'
+import { ConfirmacaoAcaoModal } from '../components/porteiro/ConfirmacaoAcaoModal'
+import { EntradaForm } from '../components/porteiro/EntradaForm'
+import { EventoModal } from '../components/porteiro/EventoModal'
+import { useEventoEntrada } from '../components/porteiro/useEventoEntrada'
+import { usePorteiroTela } from '../components/porteiro/usePorteiroTela'
+import {
+  processarArquivoListaEvento as processarArquivoListaEventoHelper,
+  processarArquivoVisitante as processarArquivoVisitanteHelper,
+  revogarPreviewTemporario,
+} from '../lib/entrada-arquivos'
 import { lerUsuarioLogado, limparSessaoUsuario } from '../lib/auth'
+import {
+  filtrarMateriaisEventoPreenchidos,
+  formatarItensEvento,
+  montarPayloadEntrada,
+  montarResumoItensEntradaEvento,
+} from '../lib/entrada-helpers'
+import {
+  filtrarConsultaRegistros,
+  obterDentroFiltrado,
+  obterHospedesDentroFiltrados,
+  obterRegistrosSelecionadosParaExportacao,
+  obterSaidosFiltrados,
+  obterUltimaEntrada,
+  resumirConsulta,
+  resumirTexto,
+} from '../lib/porteiro-consulta'
+import {
+  atualizarQuantidadeSaidaMaterial,
+  montarEstadoConfirmacaoSaida,
+} from '../lib/porteiro-confirmacao'
+import { formatarCpf, formatarData, formatarTelefone, limparNome, limparNumero, texto } from '../lib/formatters'
 import { registrarLog } from '../lib/logs'
 import { otimizarFoto } from '../lib/photo'
+import { validarCPF, sanitizarTexto } from '../lib/validators'
+import {
+  ConfirmacaoAcao,
+  FiltroConsulta,
+  FormularioEntrada,
+  FormularioEvento,
+  MaterialEvento,
+  Registro,
+  Usuario,
+} from '../lib/registros-types'
+import {
+  buscarHistoricoPorCpf as buscarHistoricoPorCpfService,
+  carregarDentro as carregarDentroService,
+  carregarSaidos as carregarSaidosService,
+  consultarRegistros as consultarRegistrosService,
+  registrarReentrada as registrarReentradaService,
+  registrarSaida as registrarSaidaService,
+} from '../lib/registros'
 import { exportarRelatorioExcel, exportarRelatorioPdf } from '../lib/reports'
 import { identificarReentradasMesmoDia, obterSituacaoRegistro } from '../lib/status'
 import { supabase } from '../lib/supabase'
-
-type Perfil = 'admin' | 'porteiro'
-
-type Usuario = {
-  id: string
-  nome: string
-  email: string
-  perfil: Perfil
-  ativo?: boolean | null
-}
-
-type MaterialEvento = {
-  id: string
-  quantidade: string
-  discriminacao: string
-  data: string
-  quantidadeSaida: string
-  observacoes: string
-}
-
-type FormularioEvento = {
-  nome: string
-  osNumero: string
-  recebimentoEm: string
-  responsavel: string
-  fone: string
-  materiais: MaterialEvento[]
-}
-
-type Registro = {
-  id: string
-  nome: string
-  operador_entrada_email?: string | null
-  operador_entrada_nome?: string | null
-  documento?: string | null
-  telefone?: string | null
-  empresa?: string | null
-  servico?: string | null
-  destino?: string | null
-  responsavel?: string | null
-  entrada_evento?: boolean | null
-  evento_nome?: string | null
-  evento_os_numero?: string | null
-  evento_recebimento_em?: string | null
-  evento_responsavel?: string | null
-  evento_fone?: string | null
-  evento_lista_foto_url?: string | null
-  evento_materiais?: MaterialEvento[] | null
-  itens_entrada?: string | null
-  foto_url?: string | null
-  hora_entrada: string
-  hora_saida?: string | null
-}
-
-type ConfirmacaoAcao =
-  | { tipo: 'saida'; registro: Registro }
-  | { tipo: 'reentrada'; registro: Registro }
-
-type FiltroConsulta = 'todos' | 'dentro' | 'reentrada' | 'saida'
-
-type FormularioEntrada = {
-  nome: string
-  documento: string
-  telefone: string
-  empresa: string
-  servico: string
-  destino: string
-  responsavel: string
-  entradaEvento: '' | 'sim' | 'nao'
-  eventoNome: string
-  itensEntrada: string
-}
 
 const formularioInicial: FormularioEntrada = {
   nome: '',
@@ -118,66 +95,6 @@ const formularioEventoInicial: FormularioEvento = {
 
 const BUCKET_FOTOS = 'registros-fotos'
 const TAMANHO_MAXIMO_FOTO = 5 * 1024 * 1024
-function chaveRegistro(registro: Registro) {
-  return `${(registro.documento || '').trim().toLowerCase()}::${registro.nome.trim().toLowerCase()}`
-}
-
-function ehMesmoDia(dataIso: string, referencia: Date) {
-  const data = new Date(dataIso)
-
-  return (
-    data.getFullYear() === referencia.getFullYear() &&
-    data.getMonth() === referencia.getMonth() &&
-    data.getDate() === referencia.getDate()
-  )
-}
-
-function formatarData(valor: string) {
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date(valor))
-}
-
-function texto(valor?: string | null) {
-  return valor && valor.trim() ? valor : '-'
-}
-
-function limparNome(valor: string) {
-  return valor.replace(/[^\p{L}\s'-]/gu, '').replace(/\s{2,}/g, ' ')
-}
-
-function limparNumero(valor: string) {
-  return valor.replace(/\D/g, '')
-}
-
-function formatarCpf(valor?: string | null) {
-  const numeros = limparNumero(valor || '').slice(0, 11)
-
-  return numeros
-    .replace(/^(\d{3})(\d)/, '$1.$2')
-    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
-    .replace(/\.(\d{3})(\d)/, '.$1-$2')
-}
-
-function formatarTelefone(valor?: string | null) {
-  const numeros = limparNumero(valor || '').slice(0, 11)
-
-  if (numeros.length <= 2) return numeros
-  if (numeros.length <= 7) return `(${numeros.slice(0, 2)}) ${numeros.slice(2)}`
-
-  return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7)}`
-}
-
-function resumirTexto(valor?: string | null, limite = 20) {
-  const textoNormalizado = (valor || '').trim()
-
-  if (textoNormalizado.length <= limite) {
-    return textoNormalizado || '-'
-  }
-
-  return `${textoNormalizado.slice(0, limite).trimEnd()}...`
-}
 
 function traduzirErroUpload(message: string) {
   const mensagem = message.toLowerCase()
@@ -216,9 +133,9 @@ async function enviarFoto(foto: File) {
 }
 
 async function enviarAnexoEvento(arquivo: File) {
+  // CORRECAO 2: extensao sempre resultava em 'pdf' independente do nome do arquivo
   if (arquivo.type === 'application/pdf') {
-    const extensao = arquivo.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'pdf'
-    const caminho = `entradas/${Date.now()}-${crypto.randomUUID()}.${extensao}`
+    const caminho = `entradas/${Date.now()}-${crypto.randomUUID()}.pdf`
 
     const { error } = await supabase.storage.from(BUCKET_FOTOS).upload(caminho, arquivo, {
       cacheControl: '3600',
@@ -242,56 +159,22 @@ function ehPdfArquivo(valor?: string | null) {
   return (valor || '').toLowerCase().includes('.pdf')
 }
 
-async function lerArquivoComoDataUrl(arquivo: File) {
-  return await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(new Error('Nao foi possivel gerar a pre-visualizacao da imagem.'))
-    reader.readAsDataURL(arquivo)
-  })
-}
-
-function formatarItensEvento(materiais: MaterialEvento[]) {
-  return materiais
-    .filter(
-      (material) =>
-        material.quantidade.trim() ||
-        material.discriminacao.trim() ||
-        material.data.trim() ||
-        material.observacoes.trim()
-    )
-    .map((material) => {
-      const partes = [
-        material.quantidade.trim() ? `${material.quantidade.trim()}x` : '',
-        material.discriminacao.trim(),
-        material.data.trim()
-          ? `(${new Intl.DateTimeFormat('pt-BR').format(new Date(`${material.data}T00:00:00`))})`
-          : '',
-        material.observacoes.trim() ? `- ${material.observacoes.trim()}` : '',
-      ].filter(Boolean)
-
-      return partes.join(' ')
-    })
-    .join(' | ')
-}
-
 export default function Porteiro() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const eventoListaInputRef = useRef<HTMLInputElement | null>(null)
   const ultimoCpfConsultadoRef = useRef('')
   const acoesEntradaRef = useRef<HTMLDivElement | null>(null)
+
+  // CORRECAO 1: ref para revogar preview sem adicionar fotoPreview como dependencia
+  // nos useCallback, evitando re-consultas desnecessarias ao CPF
+  const fotoPreviewRef = useRef('')
+
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [dentro, setDentro] = useState<Registro[]>([])
   const [form, setForm] = useState<FormularioEntrada>(formularioInicial)
-  const [eventoForm, setEventoForm] = useState<FormularioEvento>(formularioEventoInicial)
   const [foto, setFoto] = useState<File | null>(null)
   const [fotoPreview, setFotoPreview] = useState('')
-  const [eventoListaFoto, setEventoListaFoto] = useState<File | null>(null)
-  const [eventoListaFotoPreview, setEventoListaFotoPreview] = useState('')
-  const [eventoListaFotoNome, setEventoListaFotoNome] = useState('')
-  const [eventoListaFotoTipo, setEventoListaFotoTipo] = useState('')
-  const [imagemAberta, setImagemAberta] = useState<{ alt: string; src: string } | null>(null)
   const [buscaDentro, setBuscaDentro] = useState('')
   const [buscaHospedesDentro, setBuscaHospedesDentro] = useState('')
   const [buscaSaidos, setBuscaSaidos] = useState('')
@@ -302,8 +185,6 @@ export default function Porteiro() {
   const [consultaDataFim, setConsultaDataFim] = useState('')
   const [consultaPesquisa, setConsultaPesquisa] = useState('')
   const [consultaFiltro, setConsultaFiltro] = useState<FiltroConsulta>('todos')
-  const [consultaSelecionados, setConsultaSelecionados] = useState<string[]>([])
-  const [registrosExpandidos, setRegistrosExpandidos] = useState<string[]>([])
   const [saidaEventoMateriais, setSaidaEventoMateriais] = useState<MaterialEvento[]>([])
   const [cameraAberta, setCameraAberta] = useState(false)
   const [cameraDestino, setCameraDestino] = useState<'visitante' | 'listaEvento'>('visitante')
@@ -317,14 +198,44 @@ export default function Porteiro() {
   const [registrandoReentrada, setRegistrandoReentrada] = useState<string | null>(null)
   const [erro, setErro] = useState('')
   const [avisoAutopreenchimento, setAvisoAutopreenchimento] = useState('')
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; registro: Registro } | null>(null)
   const router = useRouter()
+  const {
+    imagemAberta,
+    setImagemAberta,
+    consultaSelecionados,
+    setConsultaSelecionados,
+    registrosExpandidos,
+    toggleConsultaSelecionado,
+    toggleSelecionarTodosConsulta,
+    toggleRegistroExpandido,
+    fecharImagem,
+  } = usePorteiroTela()
+  const {
+    eventoForm,
+    setEventoForm,
+    eventoListaFoto,
+    setEventoListaFoto,
+    eventoListaFotoPreview,
+    setEventoListaFotoPreview,
+    eventoListaFotoNome,
+    setEventoListaFotoNome,
+    eventoListaFotoTipo,
+    setEventoListaFotoTipo,
+    alterarCampoEvento,
+    alterarMaterialEvento,
+    adicionarMaterialEvento,
+    removerMaterialEvento,
+    limparListaEvento,
+    resetarEvento,
+  } = useEventoEntrada({
+    formularioEventoInicial,
+    criarMaterialEvento,
+    onFecharModal: () => setEventoModalAberto(false),
+  })
 
   async function carregarDentro() {
-    const { data, error } = await supabase
-      .from('registros')
-      .select('*')
-      .is('hora_saida', null)
-      .order('hora_entrada', { ascending: false })
+    const { data, error } = await carregarDentroService()
 
     if (error) {
       setErro('Nao foi possivel carregar as pessoas dentro.')
@@ -335,17 +246,7 @@ export default function Porteiro() {
   }
 
   async function carregarSaidos(termo = '') {
-    let query = supabase
-      .from('registros')
-      .select('*')
-      .not('hora_saida', 'is', null)
-      .order('hora_saida', { ascending: false })
-
-    if (termo.trim()) {
-      query = query.or(`nome.ilike.%${termo.trim()}%,documento.ilike.%${termo.trim()}%`)
-    }
-
-    const { data, error } = await query
+    const { data, error } = await carregarSaidosService(termo)
 
     if (error) {
       setErro('Nao foi possivel carregar os visitantes que ja sairam.')
@@ -380,142 +281,58 @@ export default function Porteiro() {
     void iniciar()
   }, [router])
 
+  // CORRECAO 3: separar o cleanup da stream da camera do cleanup do preview de foto
+  // para nao parar a camera quando o usuario troca de foto
   useEffect(() => {
     return () => {
-      if (fotoPreview.startsWith('blob:')) {
-        URL.revokeObjectURL(fotoPreview)
-      }
+      revogarPreviewTemporario(fotoPreviewRef.current)
+    }
+  }, [])
 
+  useEffect(() => {
+    return () => {
       streamRef.current?.getTracks().forEach((track) => track.stop())
     }
+  }, [])
+
+  // Manter a ref sincronizada com o estado
+  useEffect(() => {
+    fotoPreviewRef.current = fotoPreview
   }, [fotoPreview])
 
-  const ultimaEntrada = useMemo(() => {
-    const registrosOrdenados = [...dentro, ...saidos]
-      .filter((registro) => Boolean(registro.hora_entrada))
-      .sort(
-        (a, b) =>
-          new Date(b.hora_entrada || 0).getTime() - new Date(a.hora_entrada || 0).getTime()
-      )
-
-    if (!registrosOrdenados[0]?.hora_entrada) return '-'
-    return formatarData(registrosOrdenados[0].hora_entrada)
-  }, [dentro, saidos])
+  const ultimaEntrada = useMemo(() => obterUltimaEntrada(dentro, saidos), [dentro, saidos])
 
   const idsReentrada = useMemo(
     () => identificarReentradasMesmoDia([...dentro, ...saidos]),
     [dentro, saidos]
   )
 
-  const dentroFiltrado = useMemo(() => {
-    const termo = buscaDentro.trim().toLowerCase()
+  const dentroFiltrado = useMemo(() => obterDentroFiltrado(dentro, buscaDentro), [buscaDentro, dentro])
 
-    if (!termo) return []
+  // CORRECAO 7: removido dentroVisivel que era alias desnecessario de dentroFiltrado
 
-    return dentro.filter((registro) => {
-      const nome = registro.nome.toLowerCase()
-      const documento = (registro.documento || '').toLowerCase()
-      return nome.includes(termo) || documento.includes(termo)
-    })
-  }, [buscaDentro, dentro])
+  const hospedesDentroFiltrados = useMemo(
+    () => obterHospedesDentroFiltrados(dentro, buscaHospedesDentro),
+    [buscaHospedesDentro, dentro]
+  )
 
-  const dentroVisivel = useMemo(() => dentroFiltrado, [dentroFiltrado])
+  const saidosFiltrados = useMemo(
+    () => obterSaidosFiltrados(saidos, dentro, buscaSaidos),
+    [buscaSaidos, dentro, saidos]
+  )
 
-  const hospedesDentroFiltrados = useMemo(() => {
-    const termo = buscaHospedesDentro.trim().toLowerCase()
+  const consultaRegistrosFiltrados = useMemo(
+    () => filtrarConsultaRegistros(consultaRegistros, consultaFiltro, idsReentrada),
+    [consultaFiltro, consultaRegistros, idsReentrada]
+  )
 
-    if (!termo) return []
-
-    return dentro.filter((registro) => {
-      const nome = registro.nome.toLowerCase()
-      const documento = (registro.documento || '').toLowerCase()
-      return nome.includes(termo) || documento.includes(termo)
-    })
-  }, [buscaHospedesDentro, dentro])
-
-  const saidosFiltrados = useMemo(() => {
-    const termo = buscaSaidos.trim().toLowerCase()
-
-    if (!termo) return []
-
-    const hoje = new Date()
-    const pessoasDentro = new Set(dentro.map((registro) => chaveRegistro(registro)))
-    const ultimoRegistroPorPessoa = new Map<string, Registro>()
-
-    saidos.forEach((registro) => {
-      if (!registro.hora_saida || !ehMesmoDia(registro.hora_saida, hoje)) {
-        return
-      }
-
-      const chave = chaveRegistro(registro)
-
-      if (pessoasDentro.has(chave)) {
-        return
-      }
-
-      const atual = ultimoRegistroPorPessoa.get(chave)
-
-      if (!atual) {
-        ultimoRegistroPorPessoa.set(chave, registro)
-        return
-      }
-
-      const horaAtual = new Date(atual.hora_saida || atual.hora_entrada).getTime()
-      const horaNova = new Date(registro.hora_saida || registro.hora_entrada).getTime()
-
-      if (horaNova > horaAtual) {
-        ultimoRegistroPorPessoa.set(chave, registro)
-      }
-    })
-
-    return Array.from(ultimoRegistroPorPessoa.values()).filter((registro) => {
-      const nome = registro.nome.toLowerCase()
-      const documento = (registro.documento || '').toLowerCase()
-      return nome.includes(termo) || documento.includes(termo)
-    })
-  }, [buscaSaidos, dentro, saidos])
-
-  const consultaRegistrosFiltrados = useMemo(() => {
-    if (!consultaRegistros.length) return []
-
-    if (consultaFiltro === 'todos') {
-      return consultaRegistros
-    }
-
-    if (consultaFiltro === 'dentro') {
-      return consultaRegistros.filter((registro) => !registro.hora_saida)
-    }
-
-    if (consultaFiltro === 'saida') {
-      return consultaRegistros.filter((registro) => Boolean(registro.hora_saida))
-    }
-
-    return consultaRegistros.filter((registro) => idsReentrada.has(registro.id))
-  }, [consultaFiltro, consultaRegistros, idsReentrada])
-
-  const resumoConsulta = useMemo(() => {
-    if (!consultaExecutada) return ''
-
-    if (!consultaRegistrosFiltrados.length) {
-      return 'Nenhum registro encontrado para os filtros aplicados.'
-    }
-
-    const total = consultaRegistrosFiltrados.length
-    const sufixo = total === 1 ? 'registro encontrado' : 'registros encontrados'
-    const filtro =
-      consultaFiltro === 'todos'
-        ? 'em todos os status'
-        : consultaFiltro === 'dentro'
-          ? 'somente para pessoas dentro'
-          : consultaFiltro === 'reentrada'
-            ? 'somente para reentradas'
-            : 'somente para saidas'
-
-    return `${total} ${sufixo} ${filtro}.`
-  }, [consultaExecutada, consultaFiltro, consultaRegistrosFiltrados])
+  const resumoConsulta = useMemo(
+    () => resumirConsulta(consultaExecutada, consultaFiltro, consultaRegistrosFiltrados),
+    [consultaExecutada, consultaFiltro, consultaRegistrosFiltrados]
+  )
 
   const erroFormularioEntrada = useMemo(() => {
-    if (form.documento.trim().length !== 11) return ''
+    if (!validarCPF(form.documento)) return ''
     if (!erro) return ''
 
     const mensagensFormulario = [
@@ -536,13 +353,10 @@ export default function Porteiro() {
     return mensagensFormulario.some((mensagem) => erro.startsWith(mensagem)) ? erro : ''
   }, [erro, form.documento])
 
-  const registrosSelecionadosParaExportacao = useMemo(() => {
-    const selecionados = consultaRegistrosFiltrados.filter((registro) =>
-      consultaSelecionados.includes(registro.id)
-    )
-
-    return selecionados.length ? selecionados : consultaRegistrosFiltrados
-  }, [consultaRegistrosFiltrados, consultaSelecionados])
+  const registrosSelecionadosParaExportacao = useMemo(
+    () => obterRegistrosSelecionadosParaExportacao(consultaRegistrosFiltrados, consultaSelecionados),
+    [consultaRegistrosFiltrados, consultaSelecionados]
+  )
 
   const formularioLiberado = form.documento.trim().length === 11
 
@@ -567,57 +381,34 @@ export default function Porteiro() {
   }
 
   function limparFoto() {
-    if (fotoPreview.startsWith('blob:')) {
-      URL.revokeObjectURL(fotoPreview)
-    }
+    revogarPreviewTemporario(fotoPreviewRef.current)
 
     setFoto(null)
     setFotoPreview('')
+    fotoPreviewRef.current = ''
   }
 
-  const limparListaEvento = useCallback(() => {
-    if (eventoListaFotoPreview.startsWith('blob:')) {
-      URL.revokeObjectURL(eventoListaFotoPreview)
-    }
-
-    setEventoListaFoto(null)
-    setEventoListaFotoPreview('')
-    setEventoListaFotoNome('')
-    setEventoListaFotoTipo('')
-  }, [eventoListaFotoPreview])
-
-  const resetarEvento = useCallback((fecharModal = true) => {
-    setEventoForm({
-      ...formularioEventoInicial,
-      materiais: [criarMaterialEvento()],
-    })
-    limparListaEvento()
-    if (fecharModal) {
-      setEventoModalAberto(false)
-    }
-  }, [limparListaEvento])
-
+  // CORRECAO 1: removido fotoPreview das dependencias — agora usa fotoPreviewRef
+  // para revogar sem recriar a funcao a cada troca de foto
   const limparFormularioPorCpf = useCallback((cpf: string) => {
-    if (fotoPreview.startsWith('blob:')) {
-      URL.revokeObjectURL(fotoPreview)
-    }
+    revogarPreviewTemporario(fotoPreviewRef.current)
 
     setFoto(null)
     setFotoPreview('')
+    fotoPreviewRef.current = ''
     setForm({
       ...formularioInicial,
       documento: cpf,
     })
     resetarEvento()
-  }, [fotoPreview, resetarEvento])
+  }, [resetarEvento])
 
   const aplicarHistoricoPorCpf = useCallback((registro: Registro, cpf: string) => {
-    if (fotoPreview.startsWith('blob:')) {
-      URL.revokeObjectURL(fotoPreview)
-    }
+    revogarPreviewTemporario(fotoPreviewRef.current)
 
     setFoto(null)
     setFotoPreview(registro.foto_url || '')
+    fotoPreviewRef.current = registro.foto_url || ''
     setForm({
       nome: registro.nome || '',
       documento: cpf,
@@ -632,16 +423,10 @@ export default function Porteiro() {
     })
     resetarEvento()
     setAvisoAutopreenchimento('Dados encontrados pelo CPF e preenchidos automaticamente, incluindo a foto do ultimo registro.')
-  }, [fotoPreview, resetarEvento])
+  }, [resetarEvento])
 
   const buscarHistoricoPorCpf = useCallback(async (cpf: string) => {
-    const { data, error } = await supabase
-      .from('registros')
-      .select('nome, documento, telefone, empresa, servico, destino, responsavel, foto_url, hora_entrada')
-      .eq('documento', cpf)
-      .order('hora_entrada', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const { data, error } = await buscarHistoricoPorCpfService(cpf)
 
     if (error) {
       setErro('Nao foi possivel consultar o historico pelo CPF.')
@@ -681,70 +466,28 @@ export default function Porteiro() {
   }
 
   function processarArquivoVisitante(arquivo: File | null) {
-    setErro('')
-
-    if (!arquivo) {
-      limparFoto()
-      return
-    }
-
-    if (!arquivo.type.startsWith('image/')) {
-      limparFoto()
-      setErro('Selecione um arquivo de imagem.')
-      return
-    }
-
-    if (arquivo.size > TAMANHO_MAXIMO_FOTO) {
-      limparFoto()
-      setErro('A foto deve ter no maximo 5 MB.')
-      return
-    }
-
-    if (fotoPreview) {
-      URL.revokeObjectURL(fotoPreview)
-    }
-
-    setFoto(arquivo)
-    setFotoPreview(URL.createObjectURL(arquivo))
+    processarArquivoVisitanteHelper({
+      arquivo,
+      fotoPreview: fotoPreviewRef.current,
+      tamanhoMaximoFoto: TAMANHO_MAXIMO_FOTO,
+      limparFoto,
+      setFoto,
+      setFotoPreview,
+      setErro,
+    })
   }
 
   async function processarArquivoListaEvento(arquivo: File | null) {
-    setErro('')
-
-    if (!arquivo) {
-      limparListaEvento()
-      return
-    }
-
-    if (!arquivo.type.startsWith('image/') && arquivo.type !== 'application/pdf') {
-      limparListaEvento()
-      setErro('Selecione uma imagem ou PDF valido para a lista de materiais.')
-      return
-    }
-
-    if (arquivo.size > TAMANHO_MAXIMO_FOTO) {
-      limparListaEvento()
-      setErro('O anexo da lista deve ter no maximo 5 MB.')
-      return
-    }
-
-    setEventoListaFoto(arquivo)
-    setEventoListaFotoNome(arquivo.name)
-    setEventoListaFotoTipo(arquivo.type)
-    try {
-      if (arquivo.type === 'application/pdf') {
-        setEventoListaFotoPreview(URL.createObjectURL(arquivo))
-      } else {
-        setEventoListaFotoPreview(await lerArquivoComoDataUrl(arquivo))
-      }
-    } catch (error) {
-      limparListaEvento()
-      setErro(
-        error instanceof Error
-          ? error.message
-          : 'Nao foi possivel gerar a pre-visualizacao da lista do evento.'
-      )
-    }
+    await processarArquivoListaEventoHelper({
+      arquivo,
+      tamanhoMaximoFoto: TAMANHO_MAXIMO_FOTO,
+      limparListaEvento,
+      setEventoListaFoto,
+      setEventoListaFotoPreview,
+      setEventoListaFotoNome,
+      setEventoListaFotoTipo,
+      setErro,
+    })
   }
 
   function alterarFoto(event: ChangeEvent<HTMLInputElement>) {
@@ -755,61 +498,14 @@ export default function Porteiro() {
     void processarArquivoListaEvento(event.target.files?.[0] || null)
   }
 
-  function alterarCampoEvento(campo: Exclude<keyof FormularioEvento, 'materiais'>, valor: string) {
-    const proximoValor = campo === 'fone' ? limparNumero(valor) : valor
-    setEventoForm((atual) => ({ ...atual, [campo]: proximoValor }))
-  }
-
-  function alterarMaterialEvento(
-    materialId: string,
-    campo: Exclude<keyof MaterialEvento, 'id'>,
-    valor: string
-  ) {
-    setEventoForm((atual) => ({
-      ...atual,
-      materiais: atual.materiais.map((material) =>
-        material.id === materialId ? { ...material, [campo]: valor } : material
-      ),
-    }))
-  }
-
-  function adicionarMaterialEvento() {
-    setEventoForm((atual) => ({
-      ...atual,
-      materiais: [...atual.materiais, criarMaterialEvento()],
-    }))
-  }
-
-  function removerMaterialEvento(materialId: string) {
-    setEventoForm((atual) => ({
-      ...atual,
-      materiais:
-        atual.materiais.length === 1
-          ? [criarMaterialEvento()]
-          : atual.materiais.filter((material) => material.id !== materialId),
-    }))
-  }
-
   function abrirConfirmacaoSaida(registro: Registro) {
-    setSaidaEventoMateriais(
-      (registro.evento_materiais || []).map((material, index) => ({
-        id: material.id || `material-${index}`,
-        quantidade: material.quantidade || '',
-        discriminacao: material.discriminacao || '',
-        data: material.data || '',
-        quantidadeSaida: material.quantidadeSaida || '',
-        observacoes: material.observacoes || '',
-      }))
-    )
-    setConfirmacaoAcao({ tipo: 'saida', registro })
+    const estadoConfirmacao = montarEstadoConfirmacaoSaida(registro)
+    setSaidaEventoMateriais(estadoConfirmacao.saidaEventoMateriais)
+    setConfirmacaoAcao(estadoConfirmacao.confirmacaoAcao)
   }
 
   function alterarSaidaMaterial(materialId: string, valor: string) {
-    setSaidaEventoMateriais((atual) =>
-      atual.map((material) =>
-        material.id === materialId ? { ...material, quantidadeSaida: valor } : material
-      )
-    )
+    setSaidaEventoMateriais((atual) => atualizarQuantidadeSaidaMaterial(atual, materialId, valor))
   }
 
   async function abrirCamera(destino: 'visitante' | 'listaEvento' = 'visitante') {
@@ -891,21 +587,15 @@ export default function Porteiro() {
   function validarEntrada() {
     setErro('')
 
-    const materiaisPreenchidos = eventoForm.materiais.filter(
-      (material) =>
-        material.quantidade.trim() ||
-        material.discriminacao.trim() ||
-        material.data.trim() ||
-        material.observacoes.trim()
-    )
+    const materiaisPreenchidos = filtrarMateriaisEventoPreenchidos(eventoForm.materiais)
 
     if (!form.nome.trim()) {
       setErro('Informe um nome valido usando apenas letras.')
       return false
     }
 
-    if (form.documento.trim().length !== 11) {
-      setErro('CPF obrigatorio. Informe os 11 digitos para continuar.')
+    if (form.documento.trim().length !== 11 || !validarCPF(form.documento)) {
+      setErro('CPF invalido. Verifique os 11 digitos informados.')
       return false
     }
 
@@ -1000,20 +690,12 @@ export default function Porteiro() {
       const fotoHistoricoUrl = !foto && fotoPreview && !fotoPreview.startsWith('blob:') ? fotoPreview : null
       const fotoRegistroUrl = fotoUrl || fotoHistoricoUrl
 
-      const materiaisEvento = eventoForm.materiais.filter(
-        (material) =>
-          material.quantidade.trim() ||
-          material.discriminacao.trim() ||
-          material.data.trim() ||
-          material.observacoes.trim()
+      const materiaisEvento = filtrarMateriaisEventoPreenchidos(eventoForm.materiais)
+      const itensEventoResumo = montarResumoItensEntradaEvento(
+        form.entradaEvento,
+        listaEventoUrl,
+        materiaisEvento
       )
-      const itensEventoResumo = form.entradaEvento === 'sim'
-        ? listaEventoUrl
-          ? materiaisEvento.length
-            ? `Lista de materiais anexada por foto. ${formatarItensEvento(materiaisEvento)}`
-            : 'Lista de materiais anexada por foto.'
-          : formatarItensEvento(materiaisEvento)
-        : null
 
       if (fotoUrl) {
         await registrarLog({
@@ -1024,28 +706,16 @@ export default function Porteiro() {
         })
       }
 
-      const novoRegistro = {
-        nome: form.nome.trim(),
-        operador_entrada_email: usuario?.email || null,
-        operador_entrada_nome: usuario?.nome || null,
-        documento: form.documento.trim(),
-        telefone: form.telefone.trim(),
-        empresa: form.empresa.trim(),
-        servico: form.servico.trim(),
-        destino: form.destino.trim(),
-        responsavel: form.responsavel.trim(),
-        entrada_evento: form.entradaEvento === 'sim',
-        evento_nome: form.entradaEvento === 'sim' ? eventoForm.nome.trim() : null,
-        evento_os_numero: form.entradaEvento === 'sim' ? eventoForm.osNumero.trim() : null,
-        evento_recebimento_em: form.entradaEvento === 'sim' ? eventoForm.recebimentoEm.trim() : null,
-        evento_responsavel: form.entradaEvento === 'sim' ? eventoForm.responsavel.trim() : null,
-        evento_fone: form.entradaEvento === 'sim' ? eventoForm.fone.trim() : null,
-        evento_lista_foto_url: form.entradaEvento === 'sim' ? listaEventoUrl : null,
-        evento_materiais: form.entradaEvento === 'sim' ? materiaisEvento : null,
-        itens_entrada: itensEventoResumo,
-        hora_entrada: new Date().toISOString(),
-        ...(fotoRegistroUrl ? { foto_url: fotoRegistroUrl } : {}),
-      }
+      const novoRegistro = montarPayloadEntrada({
+        form,
+        eventoForm,
+        usuario,
+        fotoRegistroUrl,
+        listaEventoUrl,
+        materiaisEvento,
+        itensEventoResumo,
+        horaEntrada: new Date().toISOString(),
+      })
 
       const { error } = await supabase.from('registros').insert(novoRegistro)
 
@@ -1078,13 +748,11 @@ export default function Porteiro() {
     setErro('')
     setRegistrandoSaida(registro.id)
 
-    const { error } = await supabase
-      .from('registros')
-      .update({
-        hora_saida: new Date().toISOString(),
-        ...(registro.entrada_evento ? { evento_materiais: saidaEventoMateriais } : {}),
-      })
-      .eq('id', registro.id)
+    const { error } = await registrarSaidaService({
+      registroId: registro.id,
+      entradaEvento: registro.entrada_evento,
+      saidaEventoMateriais,
+    })
 
     setRegistrandoSaida(null)
 
@@ -1107,30 +775,11 @@ export default function Porteiro() {
     setErro('')
     setRegistrandoReentrada(registro.id)
 
-    const novoRegistro = {
-      nome: registro.nome,
-      operador_entrada_email: usuario?.email || null,
-      operador_entrada_nome: usuario?.nome || null,
-      documento: registro.documento || '',
-      telefone: registro.telefone || '',
-      empresa: registro.empresa || '',
-      servico: registro.servico || '',
-      destino: registro.destino || '',
-      responsavel: registro.responsavel || '',
-      entrada_evento: registro.entrada_evento ?? false,
-      evento_nome: registro.evento_nome || null,
-      evento_os_numero: registro.evento_os_numero || null,
-      evento_recebimento_em: registro.evento_recebimento_em || null,
-      evento_responsavel: registro.evento_responsavel || null,
-      evento_fone: registro.evento_fone || null,
-      evento_lista_foto_url: registro.evento_lista_foto_url || null,
-      evento_materiais: registro.evento_materiais || null,
-      itens_entrada: registro.itens_entrada || null,
-      hora_entrada: new Date().toISOString(),
-      ...(registro.foto_url ? { foto_url: registro.foto_url } : {}),
-    }
-
-    const { error } = await supabase.from('registros').insert(novoRegistro)
+    const { error } = await registrarReentradaService({
+      registro,
+      operadorEmail: usuario?.email,
+      operadorNome: usuario?.nome,
+    })
 
     setRegistrandoReentrada(null)
 
@@ -1171,8 +820,11 @@ export default function Porteiro() {
     setCarregando(false)
   }
 
-  async function consultarRegistros(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault()
+  // CORRECAO 5: removido parametro event? opcional com semantica enganosa.
+  // A funcao e sempre chamada via onSubmit, entao o evento sempre existe.
+  // Para chamadas programaticas sem evento, criar uma funcao separada se necessario.
+  async function consultarRegistros(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
     setErro('')
 
     if (!consultaDataInicio && !consultaDataFim && !consultaPesquisa.trim()) {
@@ -1181,22 +833,11 @@ export default function Porteiro() {
       return
     }
 
-    let query = supabase.from('registros').select('*').order('hora_entrada', { ascending: false })
-
-    if (consultaDataInicio) {
-      query = query.gte('hora_entrada', `${consultaDataInicio}T00:00:00`)
-    }
-
-    if (consultaDataFim) {
-      query = query.lte('hora_entrada', `${consultaDataFim}T23:59:59`)
-    }
-
-    if (consultaPesquisa.trim()) {
-      const termo = consultaPesquisa.trim()
-      query = query.or(`nome.ilike.%${termo}%,documento.ilike.%${termo}%`)
-    }
-
-    const { data, error } = await query
+    const { data, error } = await consultarRegistrosService({
+      dataInicio: consultaDataInicio,
+      dataFim: consultaDataFim,
+      pesquisa: consultaPesquisa,
+    })
 
     if (error) {
       setErro('Nao foi possivel consultar os registros.')
@@ -1236,26 +877,6 @@ export default function Porteiro() {
     setConsultaFiltro('todos')
     setConsultaRegistros([])
     setConsultaSelecionados([])
-  }
-
-  function toggleConsultaSelecionado(id: string) {
-    setConsultaSelecionados((atual) =>
-      atual.includes(id) ? atual.filter((item) => item !== id) : [...atual, id]
-    )
-  }
-
-  function toggleSelecionarTodosConsulta() {
-    const idsVisiveis = consultaRegistrosFiltrados.map((registro) => registro.id)
-
-    setConsultaSelecionados((atual) =>
-      idsVisiveis.every((id) => atual.includes(id)) ? [] : idsVisiveis
-    )
-  }
-
-  function toggleRegistroExpandido(id: string) {
-    setRegistrosExpandidos((atual) =>
-      atual.includes(id) ? atual.filter((item) => item !== id) : [...atual, id]
-    )
   }
 
   async function handleLogout() {
@@ -1397,297 +1018,56 @@ export default function Porteiro() {
         </section>
 
         <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
-          <form
-            onSubmit={solicitarConfirmacaoEntrada}
-            className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm sm:p-5"
-          >
-            <div className="mb-5">
-              <h2 className="text-lg font-bold">Registrar entrada</h2>
-              <p className="mt-1 text-sm text-[#6f4358]">
-                Inicie pelo CPF para localizar o visitante ou abrir um novo cadastro com mais agilidade.
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-[#eadde3] bg-[#fffafb] p-4">
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-                  CPF *
-                </span>
-                <input
-                  value={formatarCpf(form.documento)}
-                  onChange={(event) => alterarCampo('documento', event.target.value)}
-                  className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-3 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                  inputMode="numeric"
-                  placeholder="000.000.000-00"
-                  required
-                  autoFocus
-                />
-              </label>
-
-              <p className="mt-3 text-sm text-[#6f4358]">
-                {formularioLiberado
-                  ? 'CPF validado. Continue com o registro abaixo.'
-                  : 'Digite os 11 digitos do CPF para iniciar o atendimento.'}
-              </p>
-            </div>
-
-            {avisoAutopreenchimento ? (
-              <div className="rounded-md border border-[#d8d1b1] bg-[#fff8da] px-3 py-2 text-sm text-[#7a5b00]">
-                {avisoAutopreenchimento}
-              </div>
-            ) : null}
-
-            {formularioLiberado ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Nome *</span>
-                <input
-                  value={form.nome}
-                  onChange={(event) => alterarCampo('nome', event.target.value)}
-                  className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                  autoCapitalize="words"
-                  pattern="[A-Za-zÀ-ÿ' -]+"
-                  required
-                />
-              </label>
-
-              <input type="hidden" value={form.documento} readOnly />
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Telefone *</span>
-                <input
-                  value={formatarTelefone(form.telefone)}
-                  onChange={(event) => alterarCampo('telefone', event.target.value)}
-                  className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                  inputMode="numeric"
-                  placeholder="(00) 00000-0000"
-                  required
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Empresa</span>
-                <input
-                  value={form.empresa}
-                  onChange={(event) => alterarCampo('empresa', event.target.value)}
-                  className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Servico *</span>
-                <input
-                  value={form.servico}
-                  onChange={(event) => alterarCampo('servico', event.target.value)}
-                  className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                  required
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Destino *</span>
-                <input
-                  value={form.destino}
-                  onChange={(event) => alterarCampo('destino', event.target.value)}
-                  className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                  required
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-                  Responsavel
-                </span>
-                <input
-                  value={form.responsavel}
-                  onChange={(event) => alterarCampo('responsavel', event.target.value)}
-                  className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                />
-              </label>
-
-              <div className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-                  Entrada para evento? *
-                </span>
-                <div className="inline-flex rounded-lg border border-[#e5d4dc] bg-white p-1 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForm((atual) => ({
-                        ...atual,
-                        entradaEvento: 'nao',
-                        eventoNome: '',
-                        itensEntrada: '',
-                      }))
-                      resetarEvento()
-                    }}
-                    className={`rounded-md px-4 py-2 text-sm font-bold transition ${
-                      form.entradaEvento === 'nao'
-                        ? 'bg-[#97003f] text-white'
-                        : 'text-[#6f4358] hover:bg-[#fff0f6]'
-                    }`}
-                  >
-                    Nao
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForm((atual) => ({ ...atual, entradaEvento: 'sim' }))
-                      setEventoForm((atual) => ({
-                        ...atual,
-                        nome: atual.nome || form.destino,
-                        responsavel: atual.responsavel || form.responsavel,
-                        fone: atual.fone || form.telefone,
-                      }))
-                      setEventoModalAberto(true)
-                    }}
-                    className={`rounded-md px-4 py-2 text-sm font-bold transition ${
-                      form.entradaEvento === 'sim'
-                        ? 'bg-[#97003f] text-white'
-                        : 'text-[#6f4358] hover:bg-[#fff0f6]'
-                    }`}
-                  >
-                    Sim
-                  </button>
-                </div>
-              </div>
-
-              {form.entradaEvento === 'sim' && (
-                <div className="sm:col-span-2 rounded-lg border border-[#eadde3] bg-[#fffafb] p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-bold text-[#4a2636]">Controle de materiais do evento</p>
-                      <p className="mt-1 text-sm text-[#6f4358]">
-                        Abra a ficha do evento para preencher os materiais ou anexar a foto da folha ja preenchida.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setEventoModalAberto(true)}
-                      className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-                    >
-                      Abrir ficha do evento
-                    </button>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-                    <span className="rounded-full bg-white px-3 py-1 text-[#8a2d55]">
-                      Evento: {texto(eventoForm.nome)}
-                    </span>
-                    <span className="rounded-full bg-white px-3 py-1 text-[#8a2d55]">
-                      Lista por foto: {eventoListaFotoPreview ? 'Sim' : 'Nao'}
-                    </span>
-                    <span className="rounded-full bg-white px-3 py-1 text-[#8a2d55]">
-                      Materiais digitados: {
-                        eventoForm.materiais.filter(
-                          (material) => material.quantidade.trim() || material.discriminacao.trim()
-                        ).length
-                      }
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              <div className="sm:col-span-2">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
-                  Foto do visitante
-                </span>
-                <div className="grid gap-3 rounded-lg border border-dashed border-[#d7b8c7] bg-[#fffafb] p-3 sm:grid-cols-[140px_1fr] sm:items-center">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      fotoPreview
-                        ? setImagemAberta({ alt: 'Foto em pre-visualizacao', src: fotoPreview })
-                        : undefined
-                    }
-                    className="grid min-h-[220px] place-items-center overflow-hidden rounded-md border border-[#eadde3] bg-white sm:aspect-[3/4] sm:min-h-0"
-                  >
-                    {fotoPreview ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={fotoPreview}
-                        alt="Previa da foto"
-                        className="h-full w-full object-cover object-top bg-white sm:h-full"
-                      />
-                    ) : (
-                      <span className="px-3 text-center text-sm font-semibold text-[#8a2d55]">
-                        Sem foto
-                      </span>
-                    )}
-                  </button>
-
-                  <div className="flex flex-col gap-2">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={alterarFoto}
-                      className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2 text-sm text-[#4a2636] file:mr-3 file:rounded-md file:border-0 file:bg-[#97003f] file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
-                    />
-                    <p className="text-sm text-[#8a2d55]">
-                      A imagem sera reduzida antes do envio para economizar espaco.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => abrirCamera('visitante')}
-                        disabled={carregandoCamera}
-                        className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
-                      >
-                        {carregandoCamera ? 'Abrindo camera...' : 'Usar camera do computador'}
-                      </button>
-                      {foto && (
-                        <button
-                          type="button"
-                          onClick={limparFoto}
-                          className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-                        >
-                          Remover foto
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            ) : null}
-
-            {cameraAberta && (
-              <div className="hidden" aria-hidden="true" />
-            )}
-
-            <div ref={acoesEntradaRef} className="mt-5">
-              {erroFormularioEntrada && (
-                <div className="mb-3 rounded-md border border-[#f1d38a] bg-[#fff7db] px-4 py-3 text-sm font-medium text-[#8a5a00]">
-                  {erroFormularioEntrada}
-                </div>
-              )}
-
-              {formularioLiberado ? (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="submit"
-                    disabled={salvandoEntrada}
-                    className="rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
-                  >
-                    {salvandoEntrada ? 'Registrando...' : 'Registrar entrada'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForm(formularioInicial)
-                      setAvisoAutopreenchimento('')
-                      ultimoCpfConsultadoRef.current = ''
-                      limparFoto()
-                      setErro('')
-                    }}
-                    className="rounded-md border border-[#d7b8c7] bg-white px-4 py-3 font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          </form>
+          <div ref={acoesEntradaRef}>
+            <EntradaForm
+              form={form}
+              eventoForm={eventoForm}
+              foto={foto}
+              fotoPreview={fotoPreview}
+              eventoListaFotoPreview={eventoListaFotoPreview}
+              formularioLiberado={formularioLiberado}
+              avisoAutopreenchimento={avisoAutopreenchimento}
+              erroFormularioEntrada={erroFormularioEntrada}
+              carregandoCamera={carregandoCamera}
+              salvandoEntrada={salvandoEntrada}
+              onSubmit={solicitarConfirmacaoEntrada}
+              onAlterarCampo={alterarCampo}
+              onMarcarEventoNao={() => {
+                setForm((atual) => ({
+                  ...atual,
+                  entradaEvento: 'nao',
+                  eventoNome: '',
+                  itensEntrada: '',
+                }))
+                resetarEvento()
+              }}
+              onMarcarEventoSim={() => {
+                setForm((atual) => ({ ...atual, entradaEvento: 'sim' }))
+                setEventoForm((atual) => ({
+                  ...atual,
+                  nome: atual.nome || form.destino,
+                  responsavel: atual.responsavel || form.responsavel,
+                  fone: atual.fone || form.telefone,
+                }))
+                setEventoModalAberto(true)
+              }}
+              onAbrirFichaEvento={() => setEventoModalAberto(true)}
+              onAbrirPreviaFoto={() =>
+                setImagemAberta({ alt: 'Foto em pre-visualizacao', src: fotoPreview })
+              }
+              onAlterarFoto={alterarFoto}
+              onAbrirCamera={() => abrirCamera('visitante')}
+              onLimparFoto={limparFoto}
+              onCancelar={() => {
+                setForm(formularioInicial)
+                setAvisoAutopreenchimento('')
+                ultimoCpfConsultadoRef.current = ''
+                limparFoto()
+                setErro('')
+              }}
+            />
+            {cameraAberta && <div className="hidden" aria-hidden="true" />}
+          </div>
 
           <div className="grid gap-5">
             <div className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
@@ -1716,7 +1096,8 @@ export default function Porteiro() {
                   </p>
                 )}
 
-                {dentroVisivel.map((registro) => (
+                {/* CORRECAO 7: usando dentroFiltrado diretamente, removido alias dentroVisivel */}
+                {dentroFiltrado.map((registro) => (
                 <div
                   key={registro.id}
                   className="grid gap-4 px-4 py-4 sm:grid-cols-[56px_1fr_auto] sm:items-center"
@@ -2143,7 +1524,11 @@ export default function Porteiro() {
                   </div>
                   <button
                     type="button"
-                    onClick={toggleSelecionarTodosConsulta}
+                    onClick={() =>
+                      toggleSelecionarTodosConsulta(
+                        consultaRegistrosFiltrados.map((registro) => registro.id)
+                      )
+                    }
                     className="self-start rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
                   >
                     {consultaRegistrosFiltrados.every((registro) =>
@@ -2162,7 +1547,7 @@ export default function Porteiro() {
               </div>
             )}
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto [overflow-y:visible]">
               <table className="w-full min-w-[1240px] text-left text-sm">
                 <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
                   <tr>
@@ -2244,23 +1629,19 @@ export default function Porteiro() {
                         <td className="px-4 py-3 text-[#6f4358]">{texto(registro.destino)}</td>
                         <td className="px-4 py-3 text-[#6f4358]">
                           {registro.entrada_evento ? (
-                            <div className="group relative space-y-1">
+                            <div
+                              className="cursor-default space-y-1"
+                              onMouseEnter={(e: MouseEvent<HTMLDivElement>) => {
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                const ALTURA_TOOLTIP = 160
+                                const cabeAbaixo = rect.bottom + 8 + ALTURA_TOOLTIP < window.innerHeight
+                                const y = cabeAbaixo ? rect.bottom + 8 : rect.top - ALTURA_TOOLTIP - 8
+                                setTooltip({ x: rect.left, y, registro })
+                              }}
+                              onMouseLeave={() => setTooltip(null)}
+                            >
                               <p className="font-semibold text-[#4a2636]">{texto(registro.evento_nome)}</p>
                               <p className="text-xs leading-5">{resumirTexto(registro.itens_entrada, 20)}</p>
-                              <div className="pointer-events-none absolute left-0 top-full z-20 mt-2 hidden w-[320px] max-w-[42vw] rounded-lg border border-[#e7c8d6] bg-white p-3 text-left shadow-lg group-hover:block">
-                                <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
-                                  Evento
-                                </p>
-                                <p className="mt-1 text-sm font-semibold text-[#2b1420]">
-                                  {texto(registro.evento_nome)}
-                                </p>
-                                <p className="mt-3 text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
-                                  Itens
-                                </p>
-                                <p className="mt-1 whitespace-pre-line text-sm leading-6 text-[#6f4358]">
-                                  {texto(registro.itens_entrada).replace(/\s\|\s/g, '\n')}
-                                </p>
-                              </div>
                             </div>
                           ) : (
                             '-'
@@ -2320,281 +1701,34 @@ export default function Porteiro() {
       </div>
 
       {eventoModalAberto && form.entradaEvento === 'sim' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2b1420]/70 p-4">
-          <div className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-xl border border-[#eadde3] bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-[#f0e3e8] px-5 py-4">
-              <div>
-                <h2 className="text-lg font-bold text-[#2b1420]">Controle de entrada e saida de materiais</h2>
-                <p className="mt-1 text-sm text-[#6f4358]">
-                  Preencha a ficha do evento ou anexe a foto da folha ja preenchida.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEventoModalAberto(false)}
-                className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-              >
-                Fechar
-              </button>
-            </div>
-
-            <div className="max-h-[calc(92vh-84px)] overflow-y-auto px-5 py-5">
-              <div className="rounded-lg border border-[#eadde3] bg-[#fffafb] p-4 text-sm text-[#6f4358]">
-                Se a empresa ja trouxe a folha preenchida, basta anexar a foto da lista. Sem a foto, o preenchimento da entrada de materiais passa a ser obrigatorio.
-              </div>
-
-              <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.45fr)_340px]">
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <label className="block md:col-span-2">
-                      <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Evento *</span>
-                      <input
-                        value={eventoForm.nome}
-                        onChange={(event) => alterarCampoEvento('nome', event.target.value)}
-                        className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="mb-2 block text-sm font-semibold text-[#4a2636]">OS numero</span>
-                      <input
-                        value={eventoForm.osNumero}
-                        onChange={(event) => alterarCampoEvento('osNumero', event.target.value)}
-                        className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Recebimento em</span>
-                      <input
-                        value={eventoForm.recebimentoEm}
-                        onChange={(event) => alterarCampoEvento('recebimentoEm', event.target.value)}
-                        className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                      />
-                    </label>
-
-                    <label className="block md:col-span-1">
-                      <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Responsavel *</span>
-                      <input
-                        value={eventoForm.responsavel}
-                        onChange={(event) => alterarCampoEvento('responsavel', event.target.value)}
-                        className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                      />
-                    </label>
-
-                    <label className="block md:col-span-1">
-                      <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Telefone *</span>
-                      <input
-                        value={formatarTelefone(eventoForm.fone)}
-                        onChange={(event) => alterarCampoEvento('fone', event.target.value)}
-                        inputMode="numeric"
-                        placeholder="(00) 00000-0000"
-                        className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                      />
-                    </label>
-                  </div>
-
-                  <div className="rounded-lg border border-[#eadde3]">
-                    <div className="border-b border-[#f0e3e8] px-4 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <h3 className="text-sm font-bold text-[#2b1420]">Entrada de material</h3>
-                          <p className="mt-1 text-xs text-[#6f4358]">
-                            Preencha esta grade quando a empresa nao trouxer a lista pronta.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={adicionarMaterialEvento}
-                          className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-                        >
-                          Adicionar linha
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[820px] text-left text-sm">
-                        <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
-                          <tr>
-                            <th className="w-[92px] px-3 py-3">Qtde</th>
-                            <th className="px-3 py-3">Discriminacao</th>
-                            <th className="w-[170px] px-3 py-3">Data</th>
-                            <th className="px-3 py-3">Observacoes</th>
-                            <th className="w-[110px] px-3 py-3"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#f3e8ed]">
-                          {eventoForm.materiais.map((material) => (
-                            <tr key={material.id}>
-                              <td className="px-3 py-3">
-                                <input
-                                  value={material.quantidade}
-                                  onChange={(event) =>
-                                    alterarMaterialEvento(
-                                      material.id,
-                                      'quantidade',
-                                      limparNumero(event.target.value)
-                                    )
-                                  }
-                                  inputMode="numeric"
-                                  placeholder="0"
-                                  className="w-20 rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                                />
-                              </td>
-                              <td className="px-3 py-3">
-                                <input
-                                  value={material.discriminacao}
-                                  onChange={(event) =>
-                                    alterarMaterialEvento(material.id, 'discriminacao', event.target.value)
-                                  }
-                                  className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                                />
-                              </td>
-                              <td className="px-3 py-3">
-                                <input
-                                  type="date"
-                                  value={material.data}
-                                  onChange={(event) =>
-                                    alterarMaterialEvento(material.id, 'data', event.target.value)
-                                  }
-                                  className="w-[152px] rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                                />
-                              </td>
-                              <td className="px-3 py-3">
-                                <input
-                                  value={material.observacoes}
-                                  onChange={(event) =>
-                                    alterarMaterialEvento(material.id, 'observacoes', event.target.value)
-                                  }
-                                  className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                                />
-                              </td>
-                              <td className="px-3 py-3">
-                                <button
-                                  type="button"
-                                  onClick={() => removerMaterialEvento(material.id)}
-                                  className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-                                >
-                                  Remover
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-[#eadde3] bg-[#fffafb] p-4">
-                  <h3 className="text-sm font-bold text-[#2b1420]">Foto da lista preenchida</h3>
-                  <p className="mt-1 text-sm text-[#6f4358]">
-                    Se a empresa ja chegar com a folha pronta, anexe a imagem aqui e voce nao precisa digitar os materiais.
-                  </p>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        eventoListaFotoPreview
-                          ? eventoListaFotoTipo === 'application/pdf'
-                            ? window.open(eventoListaFotoPreview, '_blank', 'noopener,noreferrer')
-                            : setImagemAberta({
-                                alt: 'Lista de materiais anexada',
-                                src: eventoListaFotoPreview,
-                              })
-                          : undefined
-                    }
-                    className="mt-4 grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-md border border-[#eadde3] bg-white"
-                  >
-                    {eventoListaFotoPreview ? (
-                      eventoListaFotoTipo === 'application/pdf' ? (
-                        <div className="px-4 text-center">
-                          <p className="text-sm font-bold text-[#97003f]">PDF anexado</p>
-                          <p className="mt-2 text-xs text-[#6f4358] break-words">{eventoListaFotoNome || 'arquivo.pdf'}</p>
-                        </div>
-                      ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={eventoListaFotoPreview}
-                        alt="Previa da lista do evento"
-                        className="h-full w-full object-cover"
-                      />
-                      )
-                    ) : (
-                      <span className="px-4 text-center text-sm font-semibold text-[#8a2d55]">
-                        Nenhuma lista anexada
-                      </span>
-                    )}
-                  </button>
-
-                  <div className="mt-4 space-y-2">
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => eventoListaInputRef.current?.click()}
-                        className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-                      >
-                        Anexar arquivo
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => abrirCamera('listaEvento')}
-                        disabled={carregandoCamera}
-                        className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
-                      >
-                        {carregandoCamera && cameraDestino === 'listaEvento' ? 'Abrindo camera...' : 'Usar camera'}
-                      </button>
-                    </div>
-                    <input
-                      ref={eventoListaInputRef}
-                      type="file"
-                      accept="image/*,application/pdf"
-                      onChange={alterarListaEvento}
-                      className="hidden"
-                    />
-                    <p className="text-xs text-[#8a2d55]">
-                      Escolha se vai anexar a foto da folha, um PDF ou capturar direto pela webcam. Imagens tambem serao reduzidas antes do envio.
-                    </p>
-                    {eventoListaFotoPreview && (
-                      <button
-                        type="button"
-                        onClick={limparListaEvento}
-                        className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-                      >
-                        Remover foto da lista
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 flex flex-wrap justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => resetarEvento(false)}
-                  className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-                >
-                  Limpar ficha
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEventoModalAberto(false)}
-                  className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-                >
-                  Fechar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEventoModalAberto(false)}
-                  className="rounded-md bg-[#97003f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#7b0034]"
-                >
-                  Salvar ficha do evento
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <EventoModal
+          eventoForm={eventoForm}
+          eventoListaInputRef={eventoListaInputRef}
+          eventoListaFotoPreview={eventoListaFotoPreview}
+          eventoListaFotoNome={eventoListaFotoNome}
+          eventoListaFotoTipo={eventoListaFotoTipo}
+          carregandoCamera={carregandoCamera}
+          cameraDestino={cameraDestino}
+          onFechar={() => setEventoModalAberto(false)}
+          onAlterarCampoEvento={alterarCampoEvento}
+          onAdicionarMaterialEvento={adicionarMaterialEvento}
+          onAlterarMaterialEvento={alterarMaterialEvento}
+          onRemoverMaterialEvento={removerMaterialEvento}
+          onAbrirPreviaLista={() =>
+            eventoListaFotoTipo === 'application/pdf'
+              ? window.open(eventoListaFotoPreview, '_blank', 'noopener,noreferrer')
+              : setImagemAberta({
+                  alt: 'Lista de materiais anexada',
+                  src: eventoListaFotoPreview,
+                })
+          }
+          onAbrirSeletorArquivo={() => eventoListaInputRef.current?.click()}
+          onAbrirCameraListaEvento={() => abrirCamera('listaEvento')}
+          onAlterarListaEvento={alterarListaEvento}
+          onLimparListaEvento={limparListaEvento}
+          onLimparFicha={() => resetarEvento(false)}
+          onSalvarFicha={() => setEventoModalAberto(false)}
+        />
       )}
 
       {confirmacaoEntradaAberta && (
@@ -2660,111 +1794,18 @@ export default function Porteiro() {
       )}
 
       {confirmacaoAcao && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2b1420]/70 p-4">
-          <div className="w-full max-w-lg rounded-xl border border-[#eadde3] bg-white p-5 shadow-xl">
-            <h2 className="text-lg font-bold text-[#2b1420]">
-              {confirmacaoAcao.tipo === 'saida' ? 'Confirmar saida' : 'Confirmar reentrada'}
-            </h2>
-            <p className="mt-2 text-sm text-[#6f4358]">
-              {confirmacaoAcao.tipo === 'saida'
-                ? 'Confirme para registrar a saida deste visitante.'
-                : 'Confirme para registrar a reentrada deste visitante.'}
-            </p>
-
-            <div className="mt-4 rounded-lg bg-[#fffafb] p-4 text-sm text-[#4a2636]">
-              <p><strong>Nome:</strong> {confirmacaoAcao.registro.nome || '-'}</p>
-              <p className="mt-2"><strong>CPF:</strong> {formatarCpf(confirmacaoAcao.registro.documento) || '-'}</p>
-              <p className="mt-2"><strong>Empresa:</strong> {confirmacaoAcao.registro.empresa || '-'}</p>
-              {confirmacaoAcao.tipo === 'saida' ? (
-                <p className="mt-2"><strong>Entrada:</strong> {formatarData(confirmacaoAcao.registro.hora_entrada)}</p>
-              ) : (
-                <p className="mt-2"><strong>Ultima saida:</strong> {formatarData(confirmacaoAcao.registro.hora_saida || '')}</p>
-              )}
-            </div>
-
-            {confirmacaoAcao.tipo === 'saida' && confirmacaoAcao.registro.entrada_evento && (
-              <div className="mt-4 rounded-lg border border-[#eadde3]">
-                <div className="border-b border-[#f0e3e8] px-4 py-3">
-                  <h3 className="text-sm font-bold text-[#2b1420]">Saida de material</h3>
-                  <p className="mt-1 text-xs text-[#6f4358]">
-                    A entrada fica bloqueada. Informe apenas a quantidade que esta saindo agora.
-                  </p>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[760px] text-left text-sm">
-                    <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
-                      <tr>
-                        <th className="px-3 py-3">Qtde entrada</th>
-                        <th className="px-3 py-3">Discriminacao</th>
-                        <th className="px-3 py-3">Data</th>
-                        <th className="px-3 py-3">Observacoes</th>
-                        <th className="px-3 py-3">Qtde saida</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#f3e8ed]">
-                      {saidaEventoMateriais.length ? (
-                        saidaEventoMateriais.map((material) => (
-                          <tr key={`saida-material-${material.id}`}>
-                            <td className="px-3 py-3 font-semibold text-[#4a2636]">{texto(material.quantidade)}</td>
-                            <td className="px-3 py-3 text-[#6f4358]">{texto(material.discriminacao)}</td>
-                            <td className="px-3 py-3 text-[#6f4358]">
-                              {material.data ? new Intl.DateTimeFormat('pt-BR').format(new Date(`${material.data}T00:00:00`)) : '-'}
-                            </td>
-                            <td className="px-3 py-3 text-[#6f4358]">{texto(material.observacoes)}</td>
-                            <td className="px-3 py-3">
-                              <input
-                                value={material.quantidadeSaida}
-                                onChange={(event) => alterarSaidaMaterial(material.id, event.target.value)}
-                                className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
-                              />
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="px-4 py-6 text-center text-[#8a2d55]">
-                            Este evento nao possui materiais digitados na entrada.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSaidaEventoMateriais([])
-                  setConfirmacaoAcao(null)
-                }}
-                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={confirmarAcaoPendente}
-                disabled={
-                  (confirmacaoAcao.tipo === 'saida' && registrandoSaida === confirmacaoAcao.registro.id) ||
-                  (confirmacaoAcao.tipo === 'reentrada' && registrandoReentrada === confirmacaoAcao.registro.id)
-                }
-                className="rounded-md bg-[#97003f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
-              >
-                {confirmacaoAcao.tipo === 'saida'
-                  ? registrandoSaida === confirmacaoAcao.registro.id
-                    ? 'Registrando...'
-                    : 'Confirmar saida'
-                  : registrandoReentrada === confirmacaoAcao.registro.id
-                    ? 'Registrando...'
-                    : 'Confirmar reentrada'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmacaoAcaoModal
+          confirmacaoAcao={confirmacaoAcao}
+          saidaEventoMateriais={saidaEventoMateriais}
+          registrandoSaida={registrandoSaida}
+          registrandoReentrada={registrandoReentrada}
+          onAlterarSaidaMaterial={alterarSaidaMaterial}
+          onCancelar={() => {
+            setSaidaEventoMateriais([])
+            setConfirmacaoAcao(null)
+          }}
+          onConfirmar={confirmarAcaoPendente}
+        />
       )}
 
       {cameraAberta && (
@@ -2817,9 +1858,27 @@ export default function Porteiro() {
       {imagemAberta && (
         <ImageLightbox
           alt={imagemAberta.alt}
-          onClose={() => setImagemAberta(null)}
+          onClose={fecharImagem}
           src={imagemAberta.src}
         />
+      )}
+
+      {/* Tooltip fixo da coluna Evento/Itens — usa position:fixed para nao ser afetado
+          pelo overflow-x-auto da tabela e nao causar scroll ao aparecer */}
+      {tooltip && (
+        <div
+          className="pointer-events-none fixed z-50 w-[320px] max-w-[42vw] rounded-lg border border-[#e7c8d6] bg-white p-3 text-left shadow-lg"
+          style={{ top: tooltip.y, left: Math.min(Math.max(tooltip.x, 8), window.innerWidth - 340) }}
+        >
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">Evento</p>
+          <p className="mt-1 text-sm font-semibold text-[#2b1420]">
+            {texto(tooltip.registro.evento_nome)}
+          </p>
+          <p className="mt-3 text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">Itens</p>
+          <p className="mt-1 whitespace-pre-line text-sm leading-6 text-[#6f4358]">
+            {texto(tooltip.registro.itens_entrada).replace(/\s\|\s/g, '\n')}
+          </p>
+        </div>
       )}
     </main>
   )

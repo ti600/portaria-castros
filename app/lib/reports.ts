@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf'
 import * as XLSX from 'xlsx'
+import { formatarCpf, formatarData, formatarTelefone } from './formatters'
 import { identificarReentradasMesmoDia, obterSituacaoRegistro } from './status'
 
 type RegistroRelatorio = {
@@ -28,36 +29,6 @@ type RegistroRelatorio = {
 
 function limparTexto(valor?: string | null) {
   return (valor || '').replace(/[\r\n\t]+/g, ' ').trim()
-}
-
-function limparNumero(valor: string) {
-  return valor.replace(/\D/g, '')
-}
-
-function formatarCpf(valor?: string | null) {
-  const numeros = limparNumero(valor || '').slice(0, 11)
-
-  return numeros
-    .replace(/^(\d{3})(\d)/, '$1.$2')
-    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
-    .replace(/\.(\d{3})(\d)/, '.$1-$2')
-}
-
-function formatarTelefone(valor?: string | null) {
-  const numeros = limparNumero(valor || '').slice(0, 11)
-
-  if (numeros.length <= 2) return numeros
-  if (numeros.length <= 7) return `(${numeros.slice(0, 2)}) ${numeros.slice(2)}`
-
-  return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7)}`
-}
-
-function formatarData(valor?: string | null) {
-  if (!valor) return '-'
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date(valor))
 }
 
 function baixarBlob(blob: Blob, nome: string) {

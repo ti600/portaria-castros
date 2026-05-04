@@ -31,4 +31,17 @@ begin
     to anon
     with check (bucket_id = 'registros-fotos');
   end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'registros_fotos_insert_authenticated'
+  ) then
+    create policy registros_fotos_insert_authenticated
+    on storage.objects
+    for insert
+    to authenticated
+    with check (bucket_id = 'registros-fotos');
+  end if;
 end $$;
