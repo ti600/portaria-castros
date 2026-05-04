@@ -130,10 +130,6 @@ export async function lerUsuarioLogado(): Promise<Usuario | null> {
     return null
   }
 
-  if (sessaoLocal?.usuario.id === user.id) {
-    return sessaoLocal.usuario
-  }
-
   const perfil = await carregarPerfilAuth(user)
 
   if (!perfil || perfil.ativo === false) {
