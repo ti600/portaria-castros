@@ -445,7 +445,8 @@ export default function Porteiro() {
   useEffect(() => {
     const cpf = form.documento.trim()
 
-    if (cpf.length !== 11) {
+    if (cpf.length !== 11 || !validarCPF(cpf)) {
+      setAvisoAutopreenchimento('')
       ultimoCpfConsultadoRef.current = cpf
       return
     }
