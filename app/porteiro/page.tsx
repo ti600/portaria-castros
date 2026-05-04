@@ -359,6 +359,7 @@ export default function Porteiro() {
   )
 
   const formularioLiberado = form.documento.trim().length === 11 && validarCPF(form.documento)
+  const cpfCompletoInvalido = form.documento.trim().length === 11 && !validarCPF(form.documento)
 
   function alterarCampo(campo: keyof FormularioEntrada, valor: string) {
     const proximoValor =
@@ -1027,6 +1028,7 @@ export default function Porteiro() {
               fotoPreview={fotoPreview}
               eventoListaFotoPreview={eventoListaFotoPreview}
               formularioLiberado={formularioLiberado}
+              cpfCompletoInvalido={cpfCompletoInvalido}
               avisoAutopreenchimento={avisoAutopreenchimento}
               erroFormularioEntrada={erroFormularioEntrada}
               carregandoCamera={carregandoCamera}

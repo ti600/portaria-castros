@@ -11,6 +11,7 @@ type EntradaFormProps = {
   fotoPreview: string
   eventoListaFotoPreview: string
   formularioLiberado: boolean
+  cpfCompletoInvalido: boolean
   avisoAutopreenchimento: string
   erroFormularioEntrada: string
   carregandoCamera: boolean
@@ -34,6 +35,7 @@ export function EntradaForm({
   fotoPreview,
   eventoListaFotoPreview,
   formularioLiberado,
+  cpfCompletoInvalido,
   avisoAutopreenchimento,
   erroFormularioEntrada,
   carregandoCamera,
@@ -75,11 +77,13 @@ export function EntradaForm({
           />
         </label>
 
-        <p className="mt-3 text-sm text-[#6f4358]">
-          {formularioLiberado
-            ? 'CPF validado. Continue com o registro abaixo.'
-            : 'Digite os 11 digitos do CPF para iniciar o atendimento.'}
-        </p>
+        {formularioLiberado ? (
+          <p className="mt-3 text-sm text-[#2a7a3b]">CPF validado. Continue com o registro abaixo.</p>
+        ) : cpfCompletoInvalido ? (
+          <p className="mt-3 text-sm font-medium text-[#97003f]">CPF invalido. Verifique os 11 digitos informados.</p>
+        ) : (
+          <p className="mt-3 text-sm text-[#6f4358]">Digite os 11 digitos do CPF para iniciar o atendimento.</p>
+        )}
       </div>
 
       {avisoAutopreenchimento ? (
