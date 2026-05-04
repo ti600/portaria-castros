@@ -332,11 +332,11 @@ export default function Porteiro() {
   )
 
   const erroFormularioEntrada = useMemo(() => {
-    if (!validarCPF(form.documento)) return ''
     if (!erro) return ''
 
     const mensagensFormulario = [
       'Informe um nome valido',
+      'CPF invalido',
       'CPF obrigatorio',
       'Telefone obrigatorio',
       'Servico e obrigatorio',
