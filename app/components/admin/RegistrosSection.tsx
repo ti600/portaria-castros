@@ -1,7 +1,8 @@
 'use client'
 
-import { FormEvent } from 'react'
+import { FormEvent, useState } from 'react'
 import { formatarCpf, formatarData, formatarTelefone, texto } from '../../lib/formatters'
+import { resumirTexto } from '../../lib/porteiro-consulta'
 import { obterSituacaoRegistro } from '../../lib/status'
 
 type RegistroAdmin = {
@@ -57,6 +58,8 @@ export function RegistrosSection({
   onExportarPdf,
   onAbrirImagem,
 }: RegistrosSectionProps) {
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; registro: RegistroAdmin } | null>(null)
+
   return (
     <section className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
       <form
@@ -131,23 +134,23 @@ export function RegistrosSection({
       </form>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1520px] text-left text-sm">
+        <table className="w-full min-w-[1100px] text-left text-sm">
           <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
             <tr>
-              <th className="px-4 py-3">Foto</th>
-              <th className="px-4 py-3">Nome</th>
-              <th className="px-4 py-3">CPF</th>
-              <th className="px-4 py-3">Telefone</th>
-              <th className="px-4 py-3">Empresa</th>
-              <th className="px-4 py-3">Servico</th>
-              <th className="px-4 py-3">Destino</th>
-              <th className="px-4 py-3">Responsavel</th>
-              <th className="px-4 py-3">Operador da entrada</th>
-              <th className="px-4 py-3">Evento / Itens</th>
-              <th className="px-4 py-3">Anexo</th>
-              <th className="px-4 py-3">Entrada</th>
-              <th className="px-4 py-3">Saida</th>
-              <th className="px-4 py-3">Situacao</th>
+              <th className="w-14 px-2 py-3">Foto</th>
+              <th className="w-28 px-3 py-3">Nome</th>
+              <th className="w-28 px-3 py-3">CPF</th>
+              <th className="w-28 px-3 py-3">Telefone</th>
+              <th className="w-24 px-3 py-3">Empresa</th>
+              <th className="w-24 px-3 py-3">Servico</th>
+              <th className="w-24 px-3 py-3">Destino</th>
+              <th className="w-24 px-3 py-3">Responsavel</th>
+              <th className="w-36 px-3 py-3">Operador</th>
+              <th className="w-32 px-3 py-3">Evento / Itens</th>
+              <th className="w-14 px-2 py-3">Anexo</th>
+              <th className="w-28 px-3 py-3">Entrada</th>
+              <th className="w-28 px-3 py-3">Saida</th>
+              <th className="w-20 px-3 py-3">Situacao</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#f3e8ed]">
@@ -193,11 +196,22 @@ export function RegistrosSection({
                     <p className="text-xs">{texto(registro.operador_entrada_email)}</p>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-[#6f4358]">
+                <td
+                  className="px-3 py-3 text-[#6f4358]"
+                  onMouseEnter={(e) => {
+                    if (!registro.entrada_evento) return
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    const ALTURA_TOOLTIP = 160
+                    const cabeAbaixo = rect.bottom + 8 + ALTURA_TOOLTIP < window.innerHeight
+                    const y = cabeAbaixo ? rect.bottom + 8 : rect.top - ALTURA_TOOLTIP - 8
+                    setTooltip({ x: rect.left, y, registro })
+                  }}
+                  onMouseLeave={() => setTooltip(null)}
+                >
                   {registro.entrada_evento ? (
-                    <div className="space-y-1">
-                      <p className="font-semibold text-[#4a2636]">{texto(registro.evento_nome)}</p>
-                      <p className="text-xs leading-5">{texto(registro.itens_entrada)}</p>
+                    <div className="cursor-default space-y-1">
+                      <p className="font-semibold text-[#4a2636]">{resumirTexto(registro.evento_nome, 14)}</p>
+                      <p className="text-xs leading-5">{resumirTexto(registro.itens_entrada, 18)}</p>
                     </div>
                   ) : (
                     '-'
@@ -288,6 +302,20 @@ export function RegistrosSection({
           </tbody>
         </table>
       </div>
+
+      {tooltip && (
+        <div
+          className="pointer-events-none fixed z-50 w-[320px] max-w-[42vw] rounded-lg border border-[#e7c8d6] bg-white p-3 text-left shadow-lg"
+          style={{ top: tooltip.y, left: Math.min(Math.max(tooltip.x, 8), window.innerWidth - 340) }}
+        >
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">Evento</p>
+          <p className="mt-1 text-sm font-semibold text-[#2b1420]">{texto(tooltip.registro.evento_nome)}</p>
+          <p className="mt-3 text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">Itens</p>
+          <p className="mt-1 whitespace-pre-line text-sm leading-6 text-[#6f4358]">
+            {texto(tooltip.registro.itens_entrada).replace(/\s\|\s/g, '\n')}
+          </p>
+        </div>
+      )}
     </section>
   )
 }
