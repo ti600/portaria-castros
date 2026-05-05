@@ -66,26 +66,26 @@ export function EntradaForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="h-full min-h-[420px] rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm sm:p-5"
+      className="h-full min-h-[420px] rounded-xl border border-[#eadde3] dark:border-[#3a1f2a] bg-white dark:bg-[#1c1014] p-4 shadow-sm sm:p-5"
     >
       <div className="mb-5">
-        <h2 className="text-lg font-bold">Registrar entrada</h2>
-        <p className="mt-1 text-sm text-[#6f4358]">
+        <h2 className="text-lg font-bold dark:text-[#eddde6]">Registrar entrada</h2>
+        <p className="mt-1 text-sm text-[#6f4358] dark:text-[#b07f97]">
           {ehCpf
             ? 'Inicie pelo CPF para localizar o visitante ou abrir um novo cadastro com mais agilidade.'
             : 'Inicie pelo RG para localizar o visitante ou abrir um novo cadastro com mais agilidade.'}
         </p>
       </div>
 
-      <div className="rounded-lg border border-[#eadde3] bg-[#fffafb] p-4">
+      <div className="rounded-lg border border-[#eadde3] dark:border-[#3a1f2a] bg-[#fffafb] dark:bg-[#180d11] p-4">
         <label className="block">
-          <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
+          <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">
             {ehCpf ? 'CPF *' : 'RG *'}
           </span>
           <input
             value={ehCpf ? formatarCpf(form.documento) : form.documento}
             onChange={(event) => onAlterarCampo('documento', event.target.value)}
-            className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-3 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+            className="w-full rounded-md border border-[#e5d4dc] dark:border-[#3d2030] bg-white dark:bg-[#1c1014] px-3 py-3 outline-none transition focus:border-[#97003f] dark:focus:border-[#c4005a] focus:ring-4 focus:ring-[#f3c7da] dark:focus:ring-[#4a1f35] dark:text-[#eddde6] dark:placeholder:text-[#5a3347]"
             inputMode={ehCpf ? 'numeric' : 'text'}
             placeholder={ehCpf ? '000.000.000-00' : 'Ex.: 12.345.678-9'}
             required
@@ -94,13 +94,13 @@ export function EntradaForm({
         </label>
 
         {formularioLiberado ? (
-          <p className="mt-3 text-sm text-[#2a7a3b]">
+          <p className="mt-3 text-sm text-[#2a7a3b] dark:text-[#4caf72]">
             {ehCpf ? 'CPF validado.' : 'RG aceito.'} Continue com o registro abaixo.
           </p>
         ) : ehCpf && cpfCompletoInvalido ? (
-          <p className="mt-3 text-sm font-medium text-[#97003f]">CPF invalido. Verifique os 11 digitos informados.</p>
+          <p className="mt-3 text-sm font-medium text-[#97003f] dark:text-[#f07a9e]">CPF invalido. Verifique os 11 digitos informados.</p>
         ) : (
-          <p className="mt-3 text-sm text-[#6f4358]">
+          <p className="mt-3 text-sm text-[#6f4358] dark:text-[#b07f97]">
             {ehCpf
               ? 'Digite os 11 digitos do CPF para iniciar o atendimento.'
               : 'Digite ao menos 5 caracteres do RG para iniciar o atendimento.'}
@@ -110,14 +110,14 @@ export function EntradaForm({
         <button
           type="button"
           onClick={onAlternarTipoDocumento}
-          className="mt-3 text-xs font-semibold text-[#97003f] underline underline-offset-2 hover:text-[#7b0034]"
+          className="mt-3 text-xs font-semibold text-[#97003f] dark:text-[#f07a9e] underline underline-offset-2 hover:text-[#7b0034] dark:hover:text-[#f07a9e]"
         >
           {ehCpf ? 'Visitante nao tem CPF? Usar RG' : 'Visitante tem CPF? Voltar para CPF'}
         </button>
       </div>
 
       {avisoAutopreenchimento ? (
-        <div className="rounded-md border border-[#d8d1b1] bg-[#fff8da] px-3 py-2 text-sm text-[#7a5b00]">
+        <div className="rounded-md border border-[#d8d1b1] dark:border-[#4a3d00] bg-[#fff8da] dark:bg-[#1e1a00] px-3 py-2 text-sm text-[#7a5b00] dark:text-[#d4b000]">
           {avisoAutopreenchimento}
         </div>
       ) : null}
@@ -125,11 +125,11 @@ export function EntradaForm({
       {formularioLiberado ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Nome *</span>
+            <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">Nome *</span>
             <input
               value={form.nome}
               onChange={(event) => onAlterarCampo('nome', event.target.value)}
-              className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+              className="w-full rounded-md border border-[#e5d4dc] dark:border-[#3d2030] bg-[#fffafb] dark:bg-[#180d11] px-3 py-2.5 outline-none transition focus:border-[#97003f] dark:focus:border-[#c4005a] focus:ring-4 focus:ring-[#f3c7da] dark:focus:ring-[#4a1f35] dark:text-[#eddde6] dark:placeholder:text-[#5a3347]"
               autoCapitalize="words"
               required
             />
@@ -138,11 +138,11 @@ export function EntradaForm({
           <input type="hidden" value={form.documento} readOnly />
 
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Telefone *</span>
+            <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">Telefone *</span>
             <input
               value={formatarTelefone(form.telefone)}
               onChange={(event) => onAlterarCampo('telefone', event.target.value)}
-              className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+              className="w-full rounded-md border border-[#e5d4dc] dark:border-[#3d2030] bg-[#fffafb] dark:bg-[#180d11] px-3 py-2.5 outline-none transition focus:border-[#97003f] dark:focus:border-[#c4005a] focus:ring-4 focus:ring-[#f3c7da] dark:focus:ring-[#4a1f35] dark:text-[#eddde6] dark:placeholder:text-[#5a3347]"
               inputMode="numeric"
               placeholder="(00) 00000-0000"
               required
@@ -150,66 +150,66 @@ export function EntradaForm({
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Contato de emergencia</span>
+            <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">Contato de emergencia</span>
             <input
               value={formatarTelefone(form.contatoEmergencia)}
               onChange={(event) => onAlterarCampo('contatoEmergencia', event.target.value)}
-              className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+              className="w-full rounded-md border border-[#e5d4dc] dark:border-[#3d2030] bg-[#fffafb] dark:bg-[#180d11] px-3 py-2.5 outline-none transition focus:border-[#97003f] dark:focus:border-[#c4005a] focus:ring-4 focus:ring-[#f3c7da] dark:focus:ring-[#4a1f35] dark:text-[#eddde6] dark:placeholder:text-[#5a3347]"
               inputMode="numeric"
               placeholder="(00) 00000-0000"
             />
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Empresa</span>
+            <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">Empresa</span>
             <input
               value={form.empresa}
               onChange={(event) => onAlterarCampo('empresa', event.target.value)}
-              className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+              className="w-full rounded-md border border-[#e5d4dc] dark:border-[#3d2030] bg-[#fffafb] dark:bg-[#180d11] px-3 py-2.5 outline-none transition focus:border-[#97003f] dark:focus:border-[#c4005a] focus:ring-4 focus:ring-[#f3c7da] dark:focus:ring-[#4a1f35] dark:text-[#eddde6] dark:placeholder:text-[#5a3347]"
             />
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Servico *</span>
+            <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">Servico *</span>
             <input
               value={form.servico}
               onChange={(event) => onAlterarCampo('servico', event.target.value)}
-              className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+              className="w-full rounded-md border border-[#e5d4dc] dark:border-[#3d2030] bg-[#fffafb] dark:bg-[#180d11] px-3 py-2.5 outline-none transition focus:border-[#97003f] dark:focus:border-[#c4005a] focus:ring-4 focus:ring-[#f3c7da] dark:focus:ring-[#4a1f35] dark:text-[#eddde6] dark:placeholder:text-[#5a3347]"
               required
             />
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Destino *</span>
+            <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">Destino *</span>
             <input
               value={form.destino}
               onChange={(event) => onAlterarCampo('destino', event.target.value)}
-              className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+              className="w-full rounded-md border border-[#e5d4dc] dark:border-[#3d2030] bg-[#fffafb] dark:bg-[#180d11] px-3 py-2.5 outline-none transition focus:border-[#97003f] dark:focus:border-[#c4005a] focus:ring-4 focus:ring-[#f3c7da] dark:focus:ring-[#4a1f35] dark:text-[#eddde6] dark:placeholder:text-[#5a3347]"
               required
             />
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Responsavel</span>
+            <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">Responsavel</span>
             <input
               value={form.responsavel}
               onChange={(event) => onAlterarCampo('responsavel', event.target.value)}
-              className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+              className="w-full rounded-md border border-[#e5d4dc] dark:border-[#3d2030] bg-[#fffafb] dark:bg-[#180d11] px-3 py-2.5 outline-none transition focus:border-[#97003f] dark:focus:border-[#c4005a] focus:ring-4 focus:ring-[#f3c7da] dark:focus:ring-[#4a1f35] dark:text-[#eddde6] dark:placeholder:text-[#5a3347]"
             />
           </label>
 
           <div className="block">
-            <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
+            <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">
               Entrada para evento? *
             </span>
-            <div className="inline-flex rounded-lg border border-[#e5d4dc] bg-white p-1 shadow-sm">
+            <div className="inline-flex rounded-lg border border-[#e5d4dc] dark:border-[#3d2030] bg-white dark:bg-[#1c1014] p-1 shadow-sm">
               <button
                 type="button"
                 onClick={onMarcarEventoNao}
                 className={`rounded-md px-4 py-2 text-sm font-bold transition ${
                   form.entradaEvento === 'nao'
                     ? 'bg-[#97003f] text-white'
-                    : 'text-[#6f4358] hover:bg-[#fff0f6]'
+                    : 'text-[#6f4358] dark:text-[#b07f97] hover:bg-[#fff0f6] dark:hover:bg-[#2a1520]'
                 }`}
               >
                 Nao
@@ -220,7 +220,7 @@ export function EntradaForm({
                 className={`rounded-md px-4 py-2 text-sm font-bold transition ${
                   form.entradaEvento === 'sim'
                     ? 'bg-[#97003f] text-white'
-                    : 'text-[#6f4358] hover:bg-[#fff0f6]'
+                    : 'text-[#6f4358] dark:text-[#b07f97] hover:bg-[#fff0f6] dark:hover:bg-[#2a1520]'
                 }`}
               >
                 Sim
@@ -229,11 +229,11 @@ export function EntradaForm({
           </div>
 
           {form.entradaEvento === 'sim' && (
-            <div className="sm:col-span-2 rounded-lg border border-[#eadde3] bg-[#fffafb] p-4">
+            <div className="sm:col-span-2 rounded-lg border border-[#eadde3] dark:border-[#3a1f2a] bg-[#fffafb] dark:bg-[#180d11] p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-sm font-bold text-[#4a2636]">Controle de materiais do evento</p>
-                  <p className="mt-1 text-sm text-[#6f4358]">
+                  <p className="text-sm font-bold text-[#4a2636] dark:text-[#c9a0b4]">Controle de materiais do evento</p>
+                  <p className="mt-1 text-sm text-[#6f4358] dark:text-[#b07f97]">
                     Abra a ficha do evento para preencher os materiais ou anexar a foto da folha ja
                     preenchida.
                   </p>
@@ -241,20 +241,20 @@ export function EntradaForm({
                 <button
                   type="button"
                   onClick={onAbrirFichaEvento}
-                  className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                  className="rounded-md border border-[#d7b8c7] dark:border-[#4a2a38] bg-white dark:bg-[#1c1014] px-4 py-2 text-sm font-bold text-[#97003f] dark:text-[#f07a9e] transition hover:bg-[#fff0f6] dark:hover:bg-[#2a1520]"
                 >
                   Abrir ficha do evento
                 </button>
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-                <span className="rounded-full bg-white px-3 py-1 text-[#8a2d55]">
+                <span className="rounded-full bg-white dark:bg-[#1c1014] px-3 py-1 text-[#8a2d55] dark:text-[#d47a9e]">
                   Evento: {texto(eventoForm.nome)}
                 </span>
-                <span className="rounded-full bg-white px-3 py-1 text-[#8a2d55]">
+                <span className="rounded-full bg-white dark:bg-[#1c1014] px-3 py-1 text-[#8a2d55] dark:text-[#d47a9e]">
                   Lista por foto: {eventoListaFotoPreview ? 'Sim' : 'Nao'}
                 </span>
-                <span className="rounded-full bg-white px-3 py-1 text-[#8a2d55]">
+                <span className="rounded-full bg-white dark:bg-[#1c1014] px-3 py-1 text-[#8a2d55] dark:text-[#d47a9e]">
                   Materiais digitados:{' '}
                   {
                     eventoForm.materiais.filter(
@@ -267,24 +267,24 @@ export function EntradaForm({
           )}
 
           <div className="sm:col-span-2">
-            <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
+            <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">
               Foto do visitante
             </span>
-            <div className="grid gap-3 rounded-lg border border-dashed border-[#d7b8c7] bg-[#fffafb] p-3 sm:grid-cols-[140px_1fr] sm:items-center">
+            <div className="grid gap-3 rounded-lg border border-dashed border-[#d7b8c7] dark:border-[#4a2a38] bg-[#fffafb] dark:bg-[#180d11] p-3 sm:grid-cols-[140px_1fr] sm:items-center">
               <button
                 type="button"
                 onClick={fotoPreview ? onAbrirPreviaFoto : undefined}
-                className="grid min-h-[220px] place-items-center overflow-hidden rounded-md border border-[#eadde3] bg-white sm:aspect-[3/4] sm:min-h-0"
+                className="grid min-h-[220px] place-items-center overflow-hidden rounded-md border border-[#eadde3] dark:border-[#3a1f2a] bg-white dark:bg-[#1c1014] sm:aspect-[3/4] sm:min-h-0"
               >
                 {fotoPreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={fotoPreview}
                     alt="Previa da foto"
-                    className="h-full w-full object-cover object-top bg-white sm:h-full"
+                    className="h-full w-full object-cover object-top bg-white dark:bg-[#1c1014] sm:h-full"
                   />
                 ) : (
-                  <span className="px-3 text-center text-sm font-semibold text-[#8a2d55]">
+                  <span className="px-3 text-center text-sm font-semibold text-[#8a2d55] dark:text-[#d47a9e]">
                     Sem foto
                   </span>
                 )}
@@ -295,9 +295,9 @@ export function EntradaForm({
                   type="file"
                   accept="image/*"
                   onChange={onAlterarFoto}
-                  className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2 text-sm text-[#4a2636] file:mr-3 file:rounded-md file:border-0 file:bg-[#97003f] file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
+                  className="w-full rounded-md border border-[#e5d4dc] dark:border-[#3d2030] bg-white dark:bg-[#1c1014] px-3 py-2 text-sm text-[#4a2636] dark:text-[#c9a0b4] file:mr-3 file:rounded-md file:border-0 file:bg-[#97003f] file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
                 />
-                <p className="text-sm text-[#8a2d55]">
+                <p className="text-sm text-[#8a2d55] dark:text-[#d47a9e]">
                   A imagem sera reduzida antes do envio para economizar espaco.
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -305,7 +305,7 @@ export function EntradaForm({
                     type="button"
                     onClick={onAbrirCamera}
                     disabled={carregandoCamera}
-                    className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
+                    className="rounded-md border border-[#d7b8c7] dark:border-[#4a2a38] bg-white dark:bg-[#1c1014] px-3 py-2 text-sm font-bold text-[#97003f] dark:text-[#f07a9e] transition hover:bg-[#fff0f6] dark:hover:bg-[#2a1520] disabled:text-[#c08aa3] dark:disabled:text-[#5a3347]"
                   >
                     {carregandoCamera ? 'Abrindo camera...' : 'Usar camera do computador'}
                   </button>
@@ -313,7 +313,7 @@ export function EntradaForm({
                     <button
                       type="button"
                       onClick={onLimparFoto}
-                      className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                      className="rounded-md border border-[#d7b8c7] dark:border-[#4a2a38] bg-white dark:bg-[#1c1014] px-3 py-2 text-sm font-bold text-[#97003f] dark:text-[#f07a9e] transition hover:bg-[#fff0f6] dark:hover:bg-[#2a1520]"
                     >
                       Remover foto
                     </button>
@@ -327,7 +327,7 @@ export function EntradaForm({
 
       <div className="mt-5">
         {erroFormularioEntrada && (
-          <div ref={erroRef} className="mb-3 rounded-md border border-[#f1d38a] bg-[#fff7db] px-4 py-3 text-sm font-medium text-[#8a5a00]">
+          <div ref={erroRef} className="mb-3 rounded-md border border-[#f1d38a] dark:border-[#4a3d00] bg-[#fff7db] dark:bg-[#1e1a00] px-4 py-3 text-sm font-medium text-[#8a5a00] dark:text-[#d4b000]">
             {erroFormularioEntrada}
           </div>
         )}
@@ -337,14 +337,14 @@ export function EntradaForm({
             <button
               type="submit"
               disabled={salvandoEntrada}
-              className="rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
+              className="rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3] dark:disabled:bg-[#5a3347]"
             >
               {salvandoEntrada ? 'Registrando...' : 'Registrar entrada'}
             </button>
             <button
               type="button"
               onClick={onCancelar}
-              className="rounded-md border border-[#d7b8c7] bg-white px-4 py-3 font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+              className="rounded-md border border-[#d7b8c7] dark:border-[#4a2a38] bg-white dark:bg-[#1c1014] px-4 py-3 font-bold text-[#97003f] dark:text-[#f07a9e] transition hover:bg-[#fff0f6] dark:hover:bg-[#2a1520]"
             >
               Cancelar
             </button>

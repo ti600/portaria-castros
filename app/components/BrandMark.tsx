@@ -32,12 +32,12 @@ export function BrandMark({
       <div>
         <p
           className={`text-sm font-semibold uppercase tracking-[0.18em] ${
-            light ? 'text-[#f3c7da]' : 'text-[#8a2d55]'
+            light ? 'text-[#f3c7da]' : 'text-[#8a2d55] dark:text-[#d47a9e]'
           }`}
         >
           {label}
         </p>
-        <h1 className={`text-2xl font-bold ${light ? 'text-white' : 'text-[#2b1420]'}`}>
+        <h1 className={`text-2xl font-bold ${light ? 'text-white' : 'text-[#2b1420] dark:text-[#eddde6]'}`}>
           {title}
         </h1>
       </div>

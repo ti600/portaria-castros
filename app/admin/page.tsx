@@ -7,6 +7,7 @@ import { RegistrosSection } from '../components/admin/RegistrosSection'
 import { BloqueiosSection } from '../components/admin/BloqueiosSection'
 import { BrandMark } from '../components/BrandMark'
 import { ImageLightbox } from '../components/ImageLightbox'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { lerUsuarioLogado, limparSessaoUsuario } from '../lib/auth'
 import { fimDoDiaLocalEmIso, inicioDoDiaLocalEmIso } from '../lib/date-range'
 import { limparNome } from '../lib/formatters'
@@ -493,36 +494,37 @@ export default function Admin() {
   }
 
   return (
-    <main className="min-h-screen bg-[#fbf7f8] text-[#2b1420]">
+    <main className="min-h-screen bg-[#fbf7f8] text-[#2b1420] dark:bg-[#100a0d] dark:text-[#eddde6]">
       <div className="mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8">
-        <header className="mb-6 rounded-xl border border-[#eadde3] bg-white px-4 py-4 shadow-sm sm:px-5">
+        <header className="mb-6 rounded-xl border border-[#eadde3] bg-white px-4 py-4 shadow-sm sm:px-5 dark:border-[#3a1f2a] dark:bg-[#1c1014]">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="flex flex-col gap-3">
               <BrandMark compact label="Administracao" title="Painel da Portaria" />
-              <p className="max-w-2xl text-sm text-[#6f4358]">
+              <p className="max-w-2xl text-sm text-[#6f4358] dark:text-[#b07f97]">
                 Operacao administrativa, relatorios, usuarios e auditoria em um unico painel.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="rounded-md border border-[#eadde3] bg-[#fffafb] px-3 py-2 text-sm font-medium text-[#6f4358]">
+              <div className="rounded-md border border-[#eadde3] bg-[#fffafb] px-3 py-2 text-sm font-medium text-[#6f4358] dark:border-[#3a1f2a] dark:bg-[#180d11] dark:text-[#b07f97]">
                 {admin?.nome || 'Administrador'}
               </div>
               <button
                 type="button"
                 onClick={atualizarDados}
                 disabled={carregando}
-                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
+                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520] dark:disabled:text-[#5a3347]"
               >
                 Atualizar
               </button>
               <button
                 type="button"
                 onClick={() => router.push('/porteiro')}
-                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]"
               >
                 Abrir portaria
               </button>
+              <ThemeToggle />
               <button
                 type="button"
                 onClick={handleLogout}
@@ -535,7 +537,7 @@ export default function Admin() {
         </header>
 
         {erro && (
-          <div className="mb-5 rounded-md border border-[#f3b7cc] bg-[#fff0f6] px-4 py-3 text-sm font-medium text-[#97003f]">
+          <div className="mb-5 rounded-md border border-[#f3b7cc] bg-[#fff0f6] px-4 py-3 text-sm font-medium text-[#97003f] dark:border-[#6b1f3d] dark:bg-[#2a1020] dark:text-[#f07a9e]">
             {erro}
           </div>
         )}
@@ -544,14 +546,14 @@ export default function Admin() {
           {estatisticas.map((item) => (
             <div
               key={item.rotulo}
-            className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm"
+            className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm dark:border-[#3a1f2a] dark:bg-[#1c1014]"
           >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-[#8a2d55]">{item.rotulo}</p>
-                  <p className="mt-3 text-3xl font-black text-[#97003f]">{item.valor}</p>
+                  <p className="text-sm font-semibold text-[#8a2d55] dark:text-[#d47a9e]">{item.rotulo}</p>
+                  <p className="mt-3 text-3xl font-black text-[#97003f] dark:text-[#f07a9e]">{item.valor}</p>
                 </div>
-                <div className="rounded-full bg-[#fff0f6] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a2d55]">
+                <div className="rounded-full bg-[#fff0f6] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a2d55] dark:bg-[#2a0f1a] dark:text-[#d47a9e]">
                   Painel
                 </div>
               </div>
@@ -559,14 +561,14 @@ export default function Admin() {
           ))}
         </section>
 
-        <div className="mb-5 inline-flex rounded-xl border border-[#e5d4dc] bg-white p-1 shadow-sm">
+        <div className="mb-5 inline-flex rounded-xl border border-[#e5d4dc] bg-white p-1 shadow-sm dark:border-[#3d2030] dark:bg-[#1c1014]">
           <button
             type="button"
             onClick={() => setAba('registros')}
             className={`rounded-md px-4 py-2 text-sm font-bold transition ${
               aba === 'registros'
                 ? 'bg-[#97003f] text-white'
-                : 'text-[#6f4358] hover:bg-[#fff0f6]'
+                : 'text-[#6f4358] hover:bg-[#fff0f6] dark:text-[#b07f97] dark:hover:bg-[#2a1520]'
             }`}
           >
             Registros
@@ -577,7 +579,7 @@ export default function Admin() {
             className={`rounded-md px-4 py-2 text-sm font-bold transition ${
               aba === 'usuarios'
                 ? 'bg-[#97003f] text-white'
-                : 'text-[#6f4358] hover:bg-[#fff0f6]'
+                : 'text-[#6f4358] hover:bg-[#fff0f6] dark:text-[#b07f97] dark:hover:bg-[#2a1520]'
             }`}
           >
             Usuarios
@@ -588,7 +590,7 @@ export default function Admin() {
             className={`rounded-md px-4 py-2 text-sm font-bold transition ${
               aba === 'bloqueios'
                 ? 'bg-[#97003f] text-white'
-                : 'text-[#6f4358] hover:bg-[#fff0f6]'
+                : 'text-[#6f4358] hover:bg-[#fff0f6] dark:text-[#b07f97] dark:hover:bg-[#2a1520]'
             }`}
           >
             Bloqueios
@@ -599,7 +601,7 @@ export default function Admin() {
             className={`rounded-md px-4 py-2 text-sm font-bold transition ${
               aba === 'logs'
                 ? 'bg-[#97003f] text-white'
-                : 'text-[#6f4358] hover:bg-[#fff0f6]'
+                : 'text-[#6f4358] hover:bg-[#fff0f6] dark:text-[#b07f97] dark:hover:bg-[#2a1520]'
             }`}
           >
             Logs
@@ -626,58 +628,58 @@ export default function Admin() {
           <section className="grid grid-cols-1 gap-5 lg:grid-cols-[0.82fr_1.18fr]">
             <form
               onSubmit={criarUsuario}
-              className="rounded-lg border border-[#eadde3] bg-white p-4 shadow-sm sm:p-5"
+              className="rounded-lg border border-[#eadde3] bg-white p-4 shadow-sm sm:p-5 dark:border-[#3a1f2a] dark:bg-[#1c1014]"
             >
-              <h2 className="text-lg font-bold">Novo usuario</h2>
+              <h2 className="text-lg font-bold dark:text-[#eddde6]">Novo usuario</h2>
 
               <div className="mt-4 grid grid-cols-1 gap-4">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Nome</span>
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">Nome</span>
                   <input
                     value={novoUsuario.nome}
                     onChange={(event) =>
                       setNovoUsuario({ ...novoUsuario, nome: limparNome(event.target.value) })
                     }
-                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] dark:border-[#3d2030] dark:bg-[#180d11] dark:text-[#eddde6] dark:focus:border-[#c4005a] dark:focus:ring-[#4a1f35]"
                     pattern="[A-Za-zÀ-ÿ' -]+"
                     required
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">E-mail</span>
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">E-mail</span>
                   <input
                     type="email"
                     value={novoUsuario.email}
                     onChange={(event) =>
                       setNovoUsuario({ ...novoUsuario, email: event.target.value })
                     }
-                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] dark:border-[#3d2030] dark:bg-[#180d11] dark:text-[#eddde6] dark:focus:border-[#c4005a] dark:focus:ring-[#4a1f35]"
                     required
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Senha</span>
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">Senha</span>
                   <input
                     type="password"
                     value={novoUsuario.senha}
                     onChange={(event) =>
                       setNovoUsuario({ ...novoUsuario, senha: event.target.value })
                     }
-                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] dark:border-[#3d2030] dark:bg-[#180d11] dark:text-[#eddde6] dark:focus:border-[#c4005a] dark:focus:ring-[#4a1f35]"
                     required
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Perfil</span>
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">Perfil</span>
                   <select
                     value={novoUsuario.perfil}
                     onChange={(event) =>
                       setNovoUsuario({ ...novoUsuario, perfil: event.target.value as Perfil })
                     }
-                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] dark:border-[#3d2030] dark:bg-[#180d11] dark:text-[#eddde6] dark:focus:border-[#c4005a] dark:focus:ring-[#4a1f35]"
                   >
                     <option value="porteiro">Porteiro</option>
                     <option value="admin">Admin</option>
@@ -688,18 +690,18 @@ export default function Admin() {
               <button
                 type="submit"
                 disabled={salvandoUsuario}
-                className="mt-5 w-full rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
+                className="mt-5 w-full rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3] dark:disabled:bg-[#5a3347]"
               >
                 {salvandoUsuario ? 'Criando...' : 'Criar usuario'}
               </button>
             </form>
 
-            <div className="rounded-lg border border-[#eadde3] bg-white shadow-sm">
-              <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5">
-                <h2 className="text-lg font-bold">Usuarios cadastrados</h2>
+            <div className="rounded-lg border border-[#eadde3] bg-white shadow-sm dark:border-[#3a1f2a] dark:bg-[#1c1014]">
+              <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5 dark:border-[#351a25]">
+                <h2 className="text-lg font-bold dark:text-[#eddde6]">Usuarios cadastrados</h2>
               </div>
 
-              <div className="divide-y divide-[#f3e8ed]">
+              <div className="divide-y divide-[#f3e8ed] dark:divide-[#2a1020]">
                 {usuarios.map((usuario) => {
                   const estaAtivo = usuario.ativo !== false
                   const editandoSenha = senhaUsuarioId === usuario.id
@@ -708,8 +710,8 @@ export default function Admin() {
                     <div key={usuario.id} className="px-4 py-4 sm:px-5">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                          <p className="font-semibold">{usuario.nome}</p>
-                          <p className="text-sm text-[#6f4358]">
+                          <p className="font-semibold dark:text-[#eddde6]">{usuario.nome}</p>
+                          <p className="text-sm text-[#6f4358] dark:text-[#b07f97]">
                             {usuario.email} · {usuario.perfil}
                           </p>
                         </div>
@@ -718,8 +720,8 @@ export default function Admin() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-bold ${
                               estaAtivo
-                                ? 'bg-[#ffe6f0] text-[#97003f]'
-                                : 'bg-[#f7dde8] text-[#5f0029]'
+                                ? 'bg-[#ffe6f0] text-[#97003f] dark:bg-[#2a0f1a] dark:text-[#f07a9e]'
+                                : 'bg-[#f7dde8] text-[#5f0029] dark:bg-[#1e0a12] dark:text-[#c05a7a]'
                             }`}
                           >
                             {estaAtivo ? 'Ativo' : 'Inativo'}
@@ -728,7 +730,7 @@ export default function Admin() {
                             type="button"
                             onClick={() => toggleAtivo(usuario)}
                             disabled={alterandoUsuario === usuario.id}
-                            className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
+                            className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520] dark:disabled:text-[#5a3347]"
                           >
                             {alterandoUsuario === usuario.id
                               ? 'Salvando...'
@@ -750,13 +752,13 @@ export default function Admin() {
                       </div>
 
                       {editandoSenha && (
-                        <div className="mt-4 flex flex-col gap-3 rounded-md border border-[#eadde3] bg-[#fffafb] p-3 sm:flex-row sm:items-center">
+                        <div className="mt-4 flex flex-col gap-3 rounded-md border border-[#eadde3] bg-[#fffafb] p-3 sm:flex-row sm:items-center dark:border-[#3a1f2a] dark:bg-[#180d11]">
                           <input
                             type="password"
                             value={novaSenha}
                             onChange={(event) => setNovaSenha(event.target.value)}
                             placeholder="Nova senha"
-                            className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                            className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] dark:border-[#3d2030] dark:bg-[#180d11] dark:text-[#eddde6] dark:placeholder:text-[#5a3347] dark:focus:border-[#c4005a] dark:focus:ring-[#4a1f35]"
                           />
                           <button
                             type="button"
@@ -773,7 +775,7 @@ export default function Admin() {
                 })}
 
                 {usuarios.length === 0 && (
-                  <div className="px-4 py-8 text-center text-[#8a2d55]">Nenhum usuario cadastrado.</div>
+                  <div className="px-4 py-8 text-center text-[#8a2d55] dark:text-[#d47a9e]">Nenhum usuario cadastrado.</div>
                 )}
               </div>
             </div>
@@ -802,7 +804,7 @@ export default function Admin() {
         )}
 
         {aba === 'bloqueios' && (
-          <section className="rounded-lg border border-[#eadde3] bg-white p-6 shadow-sm">
+          <section className="rounded-lg border border-[#eadde3] bg-white p-6 shadow-sm dark:border-[#3a1f2a] dark:bg-[#1c1014]">
             <BloqueiosSection />
           </section>
         )}

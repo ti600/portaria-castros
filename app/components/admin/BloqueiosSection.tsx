@@ -82,45 +82,45 @@ export function BloqueiosSection() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="mb-4 text-2xl font-bold text-gray-800">Porteiros Bloqueados</h2>
-        <p className="text-gray-600">Gerenciar porteiros bloqueados por tentativas de login falhadas</p>
+        <h2 className="mb-4 text-2xl font-bold text-[#2b1420] dark:text-[#eddde6]">Porteiros Bloqueados</h2>
+        <p className="text-[#6f4358] dark:text-[#b07f97]">Gerenciar porteiros bloqueados por tentativas de login falhadas</p>
       </div>
 
       {mensagem && (
-        <div className={`rounded-lg p-4 ${mensagem.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+        <div className={`rounded-lg p-4 ${mensagem.includes('✅') ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'}`}>
           {mensagem}
         </div>
       )}
 
       {carregando ? (
         <div className="flex items-center justify-center py-8">
-          <div className="text-gray-600">Carregando...</div>
+          <div className="text-[#6f4358] dark:text-[#b07f97]">Carregando...</div>
         </div>
       ) : porteirosBloqueados.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center">
-          <p className="text-gray-600">Nenhum porteiro bloqueado no momento</p>
+        <div className="rounded-lg border border-[#eadde3] bg-[#fffafb] p-8 text-center dark:border-[#3a1f2a] dark:bg-[#180d11]">
+          <p className="text-[#6f4358] dark:text-[#b07f97]">Nenhum porteiro bloqueado no momento</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="border-b-2 border-gray-300 bg-gray-100">
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Tentativas</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Tempo Restante</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Ação</th>
+              <tr className="border-b-2 border-[#eadde3] bg-[#fff7fa] dark:border-[#3a1f2a] dark:bg-[#180d11]">
+                <th className="px-6 py-3 text-left text-sm font-semibold text-[#8a2d55] dark:text-[#d47a9e]">Email</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-[#8a2d55] dark:text-[#d47a9e]">Tentativas</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-[#8a2d55] dark:text-[#d47a9e]">Tempo Restante</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-[#8a2d55] dark:text-[#d47a9e]">Ação</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-[#f3e8ed] dark:divide-[#2a1020]">
               {porteirosBloqueados.map((porteiro) => (
-                <tr key={porteiro.email} className="border-b border-gray-200 hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm text-gray-800">{porteiro.email}</td>
+                <tr key={porteiro.email} className="hover:bg-[#fffafb] dark:hover:bg-[#1e0f16]">
+                  <td className="px-6 py-4 text-sm text-[#2b1420] dark:text-[#eddde6]">{porteiro.email}</td>
                   <td className="px-6 py-4 text-sm">
-                    <span className="inline-block rounded-full bg-red-100 px-3 py-1 text-red-700 font-semibold">
+                    <span className="inline-block rounded-full bg-red-100 px-3 py-1 font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
                       {porteiro.tentativas_erradas}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{calcularTempoRestante(porteiro.bloqueado_ate)}</td>
+                  <td className="px-6 py-4 text-sm text-[#6f4358] dark:text-[#b07f97]">{calcularTempoRestante(porteiro.bloqueado_ate)}</td>
                   <td className="px-6 py-4 text-sm">
                     <button
                       onClick={() => desbloquearPorteiro(porteiro.email)}

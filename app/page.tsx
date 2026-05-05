@@ -69,7 +69,6 @@ export default function Login() {
 
     const emailNormalizado = email.trim().toLowerCase()
 
-    // Verificar se o usuário está bloqueado
     const estaBloqueado = await verificarUserBloqueado(emailNormalizado)
     if (estaBloqueado) {
       const tempoRestante = await obterTempoRestanteBloqueio(emailNormalizado)
@@ -79,16 +78,12 @@ export default function Login() {
       return
     }
 
-    const {
-      data: authData,
-      error,
-    } = await supabase.auth.signInWithPassword({
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
       email: emailNormalizado,
       password: senha,
     })
 
     if (error || !authData.user) {
-      // Registrar tentativa falhada
       await registrarTentativaFalhada(emailNormalizado)
       setCarregando(false)
       setErro('E-mail ou senha incorretos.')
@@ -120,7 +115,6 @@ export default function Login() {
       return
     }
 
-    // Login bem-sucedido - limpar tentativas APENAS para porteiros
     if (perfil.perfil === 'porteiro') {
       await limparTentativas(emailNormalizado)
     }
@@ -130,42 +124,42 @@ export default function Login() {
   }
 
   return (
-    <main className="min-h-screen bg-[#fbf7f8] text-[#2b1420]">
+    <main className="min-h-screen bg-[#fbf7f8] text-[#2b1420] dark:bg-[#100a0d] dark:text-[#eddde6]">
       <div className="mx-auto grid min-h-screen w-full max-w-6xl grid-cols-1 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="flex items-center justify-center px-6 py-8 sm:px-10 lg:col-start-2 lg:row-start-1 lg:py-10">
           <form
             onSubmit={handleLogin}
-            className="w-full max-w-md rounded-lg border border-[#eadde3] bg-white p-6 shadow-sm sm:p-8"
+            className="w-full max-w-md rounded-lg border border-[#eadde3] bg-white p-6 shadow-sm sm:p-8 dark:border-[#3a1f2a] dark:bg-[#1c1014]"
           >
             <div className="mb-8">
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#8a2d55]">
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#8a2d55] dark:text-[#d47a9e]">
                 Acesso
               </p>
-              <h2 className="mt-2 text-3xl font-bold text-[#2b1420]">Entrar no painel</h2>
+              <h2 className="mt-2 text-3xl font-bold text-[#2b1420] dark:text-[#eddde6]">Entrar no painel</h2>
             </div>
 
             <div className="space-y-5">
               <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">E-mail</span>
+                <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">E-mail</span>
                 <input
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   autoComplete="email"
-                  className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-4 py-3 text-[#2b1420] outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                  className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-4 py-3 text-[#2b1420] outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] dark:border-[#3d2030] dark:bg-[#180d11] dark:text-[#eddde6] dark:focus:border-[#c4005a] dark:focus:ring-[#4a1f35]"
                   required
                 />
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Senha</span>
-                <div className="flex items-stretch overflow-hidden rounded-md border border-[#e5d4dc] bg-[#fffafb] transition focus-within:border-[#97003f] focus-within:ring-4 focus-within:ring-[#f3c7da]">
+                <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">Senha</span>
+                <div className="flex items-stretch overflow-hidden rounded-md border border-[#e5d4dc] bg-[#fffafb] transition focus-within:border-[#97003f] focus-within:ring-4 focus-within:ring-[#f3c7da] dark:border-[#3d2030] dark:bg-[#180d11] dark:focus-within:border-[#c4005a] dark:focus-within:ring-[#4a1f35]">
                   <input
                     type={mostrarSenha ? 'text' : 'password'}
                     value={senha}
                     onChange={(event) => setSenha(event.target.value)}
                     autoComplete="current-password"
-                    className="w-full bg-transparent px-4 py-3 text-[#2b1420] outline-none"
+                    className="w-full bg-transparent px-4 py-3 text-[#2b1420] outline-none dark:text-[#eddde6]"
                     required
                   />
                   <button
@@ -177,7 +171,7 @@ export default function Login() {
                     onTouchEnd={() => setMostrarSenha(false)}
                     onTouchCancel={() => setMostrarSenha(false)}
                     aria-label="Segure para visualizar a senha"
-                    className="border-l border-[#eadde3] px-4 text-[#97003f] transition hover:bg-[#fff0f6]"
+                    className="border-l border-[#eadde3] px-4 text-[#97003f] transition hover:bg-[#fff0f6] dark:border-[#3a1f2a] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]"
                   >
                     <EyeIcon aberto={mostrarSenha} />
                   </button>
@@ -185,19 +179,19 @@ export default function Login() {
               </label>
 
               {erro && (
-                <div className="rounded-md border border-[#f3b7cc] bg-[#fff0f6] px-4 py-3 text-sm font-medium text-[#97003f]">
+                <div className="rounded-md border border-[#f3b7cc] bg-[#fff0f6] px-4 py-3 text-sm font-medium text-[#97003f] dark:border-[#6b1f3d] dark:bg-[#2a1020] dark:text-[#f07a9e]">
                   {erro}
                 </div>
               )}
 
-              <p className="text-sm text-[#6f4358]">
+              <p className="text-sm text-[#6f4358] dark:text-[#b07f97]">
                 Esqueceu a senha? Entrar em contato com o T.I.
               </p>
 
               <button
                 type="submit"
                 disabled={carregando}
-                className="w-full rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3]"
+                className="w-full rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3] dark:disabled:bg-[#5a3347]"
               >
                 {carregando ? 'Entrando...' : 'Entrar'}
               </button>

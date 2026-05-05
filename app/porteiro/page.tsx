@@ -36,6 +36,7 @@ import {
   montarEstadoConfirmacaoSaida,
 } from '../lib/porteiro-confirmacao'
 import { formatarCpf, formatarData, formatarTelefone, limparNome, limparNumero, texto } from '../lib/formatters'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { registrarLog } from '../lib/logs'
 import { otimizarFoto } from '../lib/photo'
 import { validarCPF, sanitizarTexto } from '../lib/validators'
@@ -1004,35 +1005,36 @@ export default function Porteiro() {
   }
 
   return (
-    <main className="min-h-screen bg-[#fbf7f8] text-[#2b1420]">
+    <main className="min-h-screen bg-[#fbf7f8] text-[#2b1420] dark:bg-[#100a0d] dark:text-[#eddde6]">
       <div className="mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8">
-        <header className="mb-6 rounded-xl border border-[#eadde3] bg-white px-4 py-4 shadow-sm sm:px-5">
+        <header className="mb-6 rounded-xl border border-[#eadde3] bg-white px-4 py-4 shadow-sm sm:px-5 dark:border-[#3a1f2a] dark:bg-[#1c1014]">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="flex flex-col gap-3">
               <BrandMark compact label="Portaria" title="Controle de Entrada" />
-              <p className="max-w-2xl text-sm text-[#6f4358]">
+              <p className="max-w-2xl text-sm text-[#6f4358] dark:text-[#b07f97]">
                 Fluxo operacional para registro, consulta rapida e saida de visitantes.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="rounded-md border border-[#eadde3] bg-[#fffafb] px-3 py-2 text-sm font-medium text-[#6f4358]">
+              <div className="rounded-md border border-[#eadde3] bg-[#fffafb] px-3 py-2 text-sm font-medium text-[#6f4358] dark:border-[#3a1f2a] dark:bg-[#180d11] dark:text-[#b07f97]">
                 {usuario?.nome || 'Operador'}
               </div>
               {usuario?.perfil === 'admin' && (
                 <button
                   type="button"
                   onClick={() => router.push('/admin')}
-                  className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                  className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]"
                 >
                   Painel admin
                 </button>
               )}
+              <ThemeToggle />
               <button
                 type="button"
                 onClick={atualizarLista}
                 disabled={carregando}
-                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
+                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520] dark:disabled:text-[#5a3347]"
               >
                 Atualizar
               </button>
@@ -1048,23 +1050,23 @@ export default function Porteiro() {
         </header>
 
         {erro && !erroFormularioEntrada && (
-          <div className="mb-5 rounded-md border border-[#f1d38a] bg-[#fff7db] px-4 py-3 text-sm font-medium text-[#8a5a00]">
+          <div className="mb-5 rounded-md border border-[#f1d38a] bg-[#fff7db] px-4 py-3 text-sm font-medium text-[#8a5a00] dark:border-[#4a3d00] dark:bg-[#1e1a00] dark:text-[#d4b000]">
             {erro}
           </div>
         )}
 
         <section className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm">
-            <p className="text-sm font-semibold text-[#8a2d55]">Dentro agora</p>
-            <p className="mt-3 text-3xl font-black text-[#97003f]">{dentro.length}</p>
+          <div className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm dark:border-[#3a1f2a] dark:bg-[#1c1014]">
+            <p className="text-sm font-semibold text-[#8a2d55] dark:text-[#d47a9e]">Dentro agora</p>
+            <p className="mt-3 text-3xl font-black text-[#97003f] dark:text-[#f07a9e]">{dentro.length}</p>
           </div>
-          <div className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm">
-            <p className="text-sm font-semibold text-[#8a2d55]">Ultima entrada</p>
-            <p className="mt-3 text-xl font-black text-[#97003f]">{ultimaEntrada}</p>
+          <div className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm dark:border-[#3a1f2a] dark:bg-[#1c1014]">
+            <p className="text-sm font-semibold text-[#8a2d55] dark:text-[#d47a9e]">Ultima entrada</p>
+            <p className="mt-3 text-xl font-black text-[#97003f] dark:text-[#f07a9e]">{ultimaEntrada}</p>
           </div>
-          <div className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm">
-            <p className="text-sm font-semibold text-[#8a2d55]">Turno</p>
-            <p className="mt-3 text-xl font-black text-[#97003f]">
+          <div className="rounded-xl border border-[#eadde3] bg-white p-4 shadow-sm dark:border-[#3a1f2a] dark:bg-[#1c1014]">
+            <p className="text-sm font-semibold text-[#8a2d55] dark:text-[#d47a9e]">Turno</p>
+            <p className="mt-3 text-xl font-black text-[#97003f] dark:text-[#f07a9e]">
               {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date())}
             </p>
           </div>
@@ -1125,12 +1127,12 @@ export default function Porteiro() {
           </div>
 
           <div className="grid gap-5">
-            <div className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
-              <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5">
+            <div className="rounded-xl border border-[#eadde3] bg-white shadow-sm dark:border-[#3a1f2a] dark:bg-[#1c1014]">
+              <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5 dark:border-[#351a25]">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <h2 className="text-lg font-bold">Registrar saida</h2>
-                    <p className="mt-1 text-sm text-[#6f4358]">
+                    <h2 className="text-lg font-bold dark:text-[#eddde6]">Registrar saida</h2>
+                    <p className="mt-1 text-sm text-[#6f4358] dark:text-[#b07f97]">
                       Visualizacao rapida dos visitantes ainda ativos na portaria.
                     </p>
                   </div>
@@ -1138,15 +1140,15 @@ export default function Porteiro() {
                     value={buscaDentro}
                     onChange={(event) => setBuscaDentro(event.target.value)}
                     placeholder="Pesquisar nome ou documento"
-                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs dark:border-[#3d2030] dark:bg-[#180d11] dark:text-[#eddde6] dark:placeholder:text-[#5a3347] dark:focus:border-[#c4005a] dark:focus:ring-[#4a1f35]"
                   />
                 </div>
               </div>
 
               {buscaDentro.trim() ? (
-                <div className="divide-y divide-[#f3e8ed]">
+                <div className="divide-y divide-[#f3e8ed] dark:divide-[#2a1020]">
                 {dentroFiltrado.length === 0 && (
-                  <p className="px-4 py-8 text-center text-sm text-[#8a2d55]">
+                  <p className="px-4 py-8 text-center text-sm text-[#8a2d55] dark:text-[#d47a9e]">
                     Nenhum visitante encontrado.
                   </p>
                 )}
@@ -1167,7 +1169,7 @@ export default function Porteiro() {
                           })
                         : undefined
                     }
-                    className="size-14 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
+                    className="size-14 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb] dark:border-[#3a1f2a] dark:bg-[#180d11]"
                   >
                     {registro.foto_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -1177,7 +1179,7 @@ export default function Porteiro() {
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="grid h-full place-items-center text-sm font-black text-[#97003f]">
+                      <div className="grid h-full place-items-center text-sm font-black text-[#97003f] dark:text-[#f07a9e]">
                         {registro.nome?.charAt(0).toUpperCase() || '?'}
                       </div>
                     )}
@@ -1187,15 +1189,15 @@ export default function Porteiro() {
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="break-words font-bold">{registro.nome}</p>
                       {registro.documento && (
-                        <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55]">
+                        <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55] dark:bg-[#2a0f1a] dark:text-[#d47a9e]">
                           {formatarDocumento(registro.documento, registro.tipo_documento)}
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 break-words text-sm text-[#6f4358]">
+                    <p className="mt-1 break-words text-sm text-[#6f4358] dark:text-[#b07f97]">
                       {texto(registro.empresa)} · {texto(registro.servico)} · {texto(registro.destino)}
                     </p>
-                    <p className="mt-1 text-xs font-semibold text-[#8a2d55]">
+                    <p className="mt-1 text-xs font-semibold text-[#8a2d55] dark:text-[#d47a9e]">
                       Entrada: {formatarData(registro.hora_entrada)}
                     </p>
                     {registro.entrada_evento && (
@@ -1203,14 +1205,14 @@ export default function Porteiro() {
                         <button
                           type="button"
                           onClick={() => toggleRegistroExpandido(registro.id)}
-                          className="rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                          className="rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]"
                         >
                           {registrosExpandidos.includes(registro.id) ? '-' : '+'}
                         </button>
                       </div>
                     )}
                     {registro.entrada_evento && registrosExpandidos.includes(registro.id) && (
-                      <div className="mt-2 rounded-md bg-[#fffafb] p-3 text-xs text-[#6f4358]">
+                      <div className="mt-2 rounded-md bg-[#fffafb] p-3 text-xs text-[#6f4358] dark:bg-[#180d11] dark:text-[#b07f97]">
                         <p><strong>Evento:</strong> {texto(registro.evento_nome)}</p>
                         <p className="mt-1"><strong>OS numero:</strong> {texto(registro.evento_os_numero)}</p>
                         <p className="mt-1"><strong>Recebimento em:</strong> {texto(registro.evento_recebimento_em)}</p>
@@ -1228,7 +1230,7 @@ export default function Porteiro() {
                                     src: registro.evento_lista_foto_url || '',
                                   })
                             }
-                            className="mt-2 rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                            className="mt-2 rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]"
                           >
                             {ehPdfArquivo(registro.evento_lista_foto_url) ? 'Abrir PDF anexado' : 'Ver lista anexada'}
                           </button>
@@ -1251,12 +1253,12 @@ export default function Porteiro() {
               ) : null}
             </div>
 
-            <div className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
-              <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5">
+            <div className="rounded-xl border border-[#eadde3] bg-white shadow-sm dark:border-[#3a1f2a] dark:bg-[#1c1014]">
+              <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5 dark:border-[#351a25]">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <h2 className="text-lg font-bold">Registrar Reentrada</h2>
-                    <p className="mt-1 text-sm text-[#6f4358]">
+                    <h2 className="text-lg font-bold dark:text-[#eddde6]">Registrar Reentrada</h2>
+                    <p className="mt-1 text-sm text-[#6f4358] dark:text-[#b07f97]">
                       Consulte quem ja saiu e registre o retorno sem preencher tudo de novo.
                     </p>
                   </div>
@@ -1268,15 +1270,15 @@ export default function Porteiro() {
                       void carregarSaidos(valor)
                     }}
                     placeholder="Pesquisar nome ou documento"
-                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs dark:border-[#3d2030] dark:bg-[#180d11] dark:text-[#eddde6] dark:placeholder:text-[#5a3347] dark:focus:border-[#c4005a] dark:focus:ring-[#4a1f35]"
                   />
                 </div>
               </div>
 
               {buscaSaidos.trim() ? (
-                <div className="divide-y divide-[#f3e8ed]">
+                <div className="divide-y divide-[#f3e8ed] dark:divide-[#2a1020]">
                 {saidosFiltrados.length === 0 && (
-                  <p className="px-4 py-8 text-center text-sm text-[#8a2d55]">
+                  <p className="px-4 py-8 text-center text-sm text-[#8a2d55] dark:text-[#d47a9e]">
                     Nenhum visitante com saida registrada foi encontrado.
                   </p>
                 )}
@@ -1296,7 +1298,7 @@ export default function Porteiro() {
                             })
                           : undefined
                       }
-                      className="size-14 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
+                      className="size-14 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb] dark:border-[#3a1f2a] dark:bg-[#180d11]"
                     >
                       {registro.foto_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -1306,7 +1308,7 @@ export default function Porteiro() {
                           className="h-full w-full object-cover"
                         />
                       ) : (
-                        <div className="grid h-full place-items-center text-sm font-black text-[#97003f]">
+                        <div className="grid h-full place-items-center text-sm font-black text-[#97003f] dark:text-[#f07a9e]">
                           {registro.nome?.charAt(0).toUpperCase() || '?'}
                         </div>
                       )}
@@ -1316,15 +1318,15 @@ export default function Porteiro() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="break-words font-bold">{registro.nome}</p>
                         {registro.documento && (
-                          <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55]">
+                          <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55] dark:bg-[#2a0f1a] dark:text-[#d47a9e]">
                             {formatarDocumento(registro.documento, registro.tipo_documento)}
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 break-words text-sm text-[#6f4358]">
+                      <p className="mt-1 break-words text-sm text-[#6f4358] dark:text-[#b07f97]">
                         {texto(registro.empresa)} · {texto(registro.servico)} · {texto(registro.destino)}
                       </p>
-                      <p className="mt-1 text-xs font-semibold text-[#8a2d55]">
+                      <p className="mt-1 text-xs font-semibold text-[#8a2d55] dark:text-[#d47a9e]">
                         Saida: {formatarData(registro.hora_saida || '')}
                       </p>
                     </div>
@@ -1333,7 +1335,7 @@ export default function Porteiro() {
                       type="button"
                       onClick={() => setConfirmacaoAcao({ tipo: 'reentrada', registro })}
                       disabled={registrandoReentrada === registro.id}
-                      className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3]"
+                      className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] disabled:text-[#c08aa3] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520] dark:disabled:text-[#5a3347]"
                     >
                       {registrandoReentrada === registro.id ? 'Salvando...' : 'Registrar reentrada'}
                     </button>
@@ -1343,12 +1345,12 @@ export default function Porteiro() {
               ) : null}
             </div>
 
-            <div className="rounded-xl border border-[#eadde3] bg-white shadow-sm">
-              <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5">
+            <div className="rounded-xl border border-[#eadde3] bg-white shadow-sm dark:border-[#3a1f2a] dark:bg-[#1c1014]">
+              <div className="border-b border-[#f0e3e8] px-4 py-4 sm:px-5 dark:border-[#351a25]">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <h2 className="text-lg font-bold">Pessoas dentro do hotel</h2>
-                    <p className="mt-1 text-sm text-[#6f4358]">
+                    <h2 className="text-lg font-bold dark:text-[#eddde6]">Pessoas dentro do hotel</h2>
+                    <p className="mt-1 text-sm text-[#6f4358] dark:text-[#b07f97]">
                       Consulta rapida por nome ou CPF dos visitantes que ainda estao dentro.
                     </p>
                   </div>
@@ -1356,15 +1358,15 @@ export default function Porteiro() {
                     value={buscaHospedesDentro}
                     onChange={(event) => setBuscaHospedesDentro(event.target.value)}
                     placeholder="Pesquisar nome ou documento"
-                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-[#fffafb] px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] lg:max-w-xs dark:border-[#3d2030] dark:bg-[#180d11] dark:text-[#eddde6] dark:placeholder:text-[#5a3347] dark:focus:border-[#c4005a] dark:focus:ring-[#4a1f35]"
                   />
                 </div>
               </div>
 
               {buscaHospedesDentro.trim() ? (
-                <div className="divide-y divide-[#f3e8ed]">
+                <div className="divide-y divide-[#f3e8ed] dark:divide-[#2a1020]">
                 {hospedesDentroFiltrados.length === 0 && (
-                  <p className="px-4 py-8 text-center text-sm text-[#8a2d55]">
+                  <p className="px-4 py-8 text-center text-sm text-[#8a2d55] dark:text-[#d47a9e]">
                     Nenhum visitante encontrado.
                   </p>
                 )}
@@ -1384,7 +1386,7 @@ export default function Porteiro() {
                             })
                           : undefined
                       }
-                      className="size-14 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
+                      className="size-14 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb] dark:border-[#3a1f2a] dark:bg-[#180d11]"
                     >
                       {registro.foto_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -1394,7 +1396,7 @@ export default function Porteiro() {
                           className="h-full w-full object-cover"
                         />
                       ) : (
-                        <div className="grid h-full place-items-center text-sm font-black text-[#97003f]">
+                        <div className="grid h-full place-items-center text-sm font-black text-[#97003f] dark:text-[#f07a9e]">
                           {registro.nome?.charAt(0).toUpperCase() || '?'}
                         </div>
                       )}
@@ -1404,12 +1406,12 @@ export default function Porteiro() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="break-words font-bold">{registro.nome}</p>
                         {registro.documento && (
-                          <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55]">
+                          <span className="rounded-full bg-[#fff0f6] px-2.5 py-1 text-[11px] font-semibold text-[#8a2d55] dark:bg-[#2a0f1a] dark:text-[#d47a9e]">
                             {formatarDocumento(registro.documento, registro.tipo_documento)}
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 break-words text-sm text-[#6f4358]">
+                      <p className="mt-1 break-words text-sm text-[#6f4358] dark:text-[#b07f97]">
                         {texto(registro.empresa)} · {texto(registro.servico)} · {texto(registro.destino)}
                       </p>
                       {registro.entrada_evento && (
@@ -1417,17 +1419,17 @@ export default function Porteiro() {
                           <button
                             type="button"
                             onClick={() => toggleRegistroExpandido(registro.id)}
-                            className="rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                            className="rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]"
                           >
                             {registrosExpandidos.includes(registro.id) ? '-' : '+'}
                           </button>
                         </div>
                       )}
-                      <p className="mt-1 text-xs font-semibold text-[#8a2d55]">
+                      <p className="mt-1 text-xs font-semibold text-[#8a2d55] dark:text-[#d47a9e]">
                         Entrada: {formatarData(registro.hora_entrada)}
                       </p>
                       {registro.entrada_evento && registrosExpandidos.includes(registro.id) && (
-                        <div className="mt-2 rounded-md bg-[#fffafb] p-3 text-xs text-[#6f4358]">
+                        <div className="mt-2 rounded-md bg-[#fffafb] p-3 text-xs text-[#6f4358] dark:bg-[#180d11] dark:text-[#b07f97]">
                           <p><strong>Evento:</strong> {texto(registro.evento_nome)}</p>
                           <p className="mt-1"><strong>OS numero:</strong> {texto(registro.evento_os_numero)}</p>
                           <p className="mt-1"><strong>Recebimento em:</strong> {texto(registro.evento_recebimento_em)}</p>
@@ -1445,7 +1447,7 @@ export default function Porteiro() {
                                       src: registro.evento_lista_foto_url || '',
                                     })
                               }
-                              className="mt-2 rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                              className="mt-2 rounded-md border border-[#d7b8c7] bg-white px-2.5 py-1 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]"
                             >
                               {ehPdfArquivo(registro.evento_lista_foto_url) ? 'Abrir PDF anexado' : 'Ver lista anexada'}
                             </button>
@@ -1461,15 +1463,15 @@ export default function Porteiro() {
           </div>
         </section>
 
-        <section className="mt-5 rounded-xl border border-[#eadde3] bg-white shadow-sm">
+        <section className="mt-5 rounded-xl border border-[#eadde3] bg-white shadow-sm dark:border-[#3a1f2a] dark:bg-[#1c1014]">
             <form
               onSubmit={consultarRegistros}
-              className="flex flex-col gap-4 border-b border-[#f0e3e8] px-4 py-4 sm:px-5"
+              className="flex flex-col gap-4 border-b border-[#f0e3e8] px-4 py-4 sm:px-5 dark:border-[#351a25]"
             >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h2 className="text-lg font-bold">Consultar</h2>
-                  <p className="mt-1 text-sm text-[#6f4358]">
+                  <h2 className="text-lg font-bold dark:text-[#eddde6]">Consultar</h2>
+                  <p className="mt-1 text-sm text-[#6f4358] dark:text-[#b07f97]">
                     Pesquise registros por periodo, nome, CPF e situacao operacional.
                   </p>
                 </div>
@@ -1477,7 +1479,7 @@ export default function Porteiro() {
                   <button
                     type="button"
                     onClick={exportarConsultaExcel}
-                    className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                    className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]"
                   >
                     Exportar Excel
                   </button>
@@ -1491,36 +1493,36 @@ export default function Porteiro() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 rounded-lg bg-[#fffafb] p-3 lg:grid-cols-[180px_180px_minmax(220px,1fr)_auto_auto]">
+              <div className="grid grid-cols-1 gap-3 rounded-lg bg-[#fffafb] p-3 lg:grid-cols-[180px_180px_minmax(220px,1fr)_auto_auto] dark:bg-[#180d11]">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Data inicial</span>
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">Data inicial</span>
                   <input
                     type="date"
                     value={consultaDataInicio}
                     onChange={(event) => setConsultaDataInicio(event.target.value)}
-                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] dark:border-[#3d2030] dark:bg-[#180d11] dark:text-[#eddde6] dark:[color-scheme:dark] dark:focus:border-[#c4005a] dark:focus:ring-[#4a1f35]"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">Data final</span>
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">Data final</span>
                   <input
                     type="date"
                     value={consultaDataFim}
                     onChange={(event) => setConsultaDataFim(event.target.value)}
-                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] dark:border-[#3d2030] dark:bg-[#180d11] dark:text-[#eddde6] dark:[color-scheme:dark] dark:focus:border-[#c4005a] dark:focus:ring-[#4a1f35]"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#4a2636]">
+                  <span className="mb-2 block text-sm font-semibold text-[#4a2636] dark:text-[#c9a0b4]">
                     Pesquisar nome ou documento
                   </span>
                   <input
                     value={consultaPesquisa}
                     onChange={(event) => setConsultaPesquisa(event.target.value)}
                     placeholder="Ex.: Marcello ou 123456789"
-                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da]"
+                    className="w-full rounded-md border border-[#e5d4dc] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#97003f] focus:ring-4 focus:ring-[#f3c7da] dark:border-[#3d2030] dark:bg-[#180d11] dark:text-[#eddde6] dark:placeholder:text-[#5a3347] dark:focus:border-[#c4005a] dark:focus:ring-[#4a1f35]"
                   />
                 </label>
 
@@ -1534,7 +1536,7 @@ export default function Porteiro() {
                 <button
                   type="button"
                   onClick={limparConsulta}
-                  className="self-end rounded-md border border-[#d7b8c7] bg-white px-4 py-2.5 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                  className="self-end rounded-md border border-[#d7b8c7] bg-white px-4 py-2.5 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]"
                 >
                   Limpar filtros
                 </button>
@@ -1555,7 +1557,7 @@ export default function Porteiro() {
                     className={`rounded-full px-4 py-2 text-sm font-bold transition ${
                       consultaFiltro === item.id
                         ? 'border border-[#97003f] bg-[#97003f] text-white shadow-sm'
-                        : 'border border-[#d7b8c7] bg-white text-[#97003f] hover:bg-[#fff0f6]'
+                        : 'border border-[#d7b8c7] bg-white text-[#97003f] hover:bg-[#fff0f6] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]'
                     }`}
                   >
                     {item.label}
@@ -1564,14 +1566,14 @@ export default function Porteiro() {
                 </div>
 
                 {(consultaDataInicio || consultaDataFim || consultaPesquisa.trim() || consultaFiltro !== 'todos') && (
-                  <div className="text-sm font-medium text-[#8a2d55]">
+                  <div className="text-sm font-medium text-[#8a2d55] dark:text-[#d47a9e]">
                     Filtros ativos
                   </div>
                 )}
               </div>
 
               {consultaRegistrosFiltrados.length > 0 && (
-                <div className="flex flex-col gap-2 text-sm text-[#8a2d55] sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-2 text-sm text-[#8a2d55] sm:flex-row sm:items-center sm:justify-between dark:text-[#d47a9e]">
                   <div>
                     {consultaSelecionados.length > 0
                       ? `${consultaSelecionados.length} registro(s) selecionado(s) para exportacao.`
@@ -1584,7 +1586,7 @@ export default function Porteiro() {
                         consultaRegistrosFiltrados.map((registro) => registro.id)
                       )
                     }
-                    className="self-start rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                    className="self-start rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-xs font-bold text-[#97003f] transition hover:bg-[#fff0f6] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]"
                   >
                     {consultaRegistrosFiltrados.every((registro) =>
                       consultaSelecionados.includes(registro.id)
@@ -1597,14 +1599,14 @@ export default function Porteiro() {
             </form>
 
             {resumoConsulta && (
-              <div className="border-b border-[#f0e3e8] bg-[#fffafb] px-4 py-3 text-sm font-medium text-[#8a2d55] sm:px-5">
+              <div className="border-b border-[#f0e3e8] bg-[#fffafb] px-4 py-3 text-sm font-medium text-[#8a2d55] sm:px-5 dark:border-[#351a25] dark:bg-[#180d11] dark:text-[#d47a9e]">
                 {resumoConsulta}
               </div>
             )}
 
             <div className="overflow-x-auto [overflow-y:visible]">
               <table className="w-full min-w-[1240px] text-left text-sm">
-                <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">
+                <thead className="bg-[#fff7fa] text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55] dark:bg-[#180d11] dark:text-[#d47a9e]">
                   <tr>
                     <th className="px-4 py-3">Sel.</th>
                     <th className="px-4 py-3">Foto</th>
@@ -1620,10 +1622,10 @@ export default function Porteiro() {
                     <th className="px-4 py-3">Situacao</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#f3e8ed]">
+                <tbody className="divide-y divide-[#f3e8ed] dark:divide-[#2a1020]">
                   {!consultaExecutada && !consultaDataInicio && !consultaDataFim && !consultaPesquisa.trim() && (
                     <tr>
-                      <td colSpan={12} className="px-4 py-8 text-center text-[#8a2d55]">
+                      <td colSpan={12} className="px-4 py-8 text-center text-[#8a2d55] dark:text-[#d47a9e]">
                         Preencha uma data ou pesquisa para carregar os registros.
                       </td>
                     </tr>
@@ -1631,7 +1633,7 @@ export default function Porteiro() {
 
                   {consultaExecutada && consultaRegistrosFiltrados.length === 0 && (
                     <tr>
-                      <td colSpan={12} className="px-4 py-8 text-center text-[#8a2d55]">
+                      <td colSpan={12} className="px-4 py-8 text-center text-[#8a2d55] dark:text-[#d47a9e]">
                         Nenhum registro encontrado para o filtro selecionado.
                       </td>
                     </tr>
@@ -1641,7 +1643,7 @@ export default function Porteiro() {
                           const situacao = obterSituacaoRegistro(registro, idsReentrada)
 
                     return (
-                      <tr key={`consulta-${registro.id}`} className="hover:bg-[#fffafb]">
+                      <tr key={`consulta-${registro.id}`} className="hover:bg-[#fffafb] dark:hover:bg-[#1e0f16]">
                         <td className="px-4 py-3">
                           <input
                             type="checkbox"
@@ -1661,7 +1663,7 @@ export default function Porteiro() {
                                   })
                                 : undefined
                             }
-                            className="size-12 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
+                            className="size-12 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb] dark:border-[#3a1f2a] dark:bg-[#180d11]"
                           >
                             {registro.foto_url ? (
                               // eslint-disable-next-line @next/next/no-img-element
@@ -1671,27 +1673,27 @@ export default function Porteiro() {
                                 className="h-full w-full object-cover"
                               />
                             ) : (
-                              <div className="grid h-full place-items-center text-sm font-black text-[#97003f]">
+                              <div className="grid h-full place-items-center text-sm font-black text-[#97003f] dark:text-[#f07a9e]">
                                 {registro.nome?.charAt(0).toUpperCase() || '?'}
                               </div>
                             )}
                           </button>
                         </td>
                         <td className="px-4 py-3 font-semibold">{texto(registro.nome)}</td>
-                        <td className="px-4 py-3 text-[#6f4358]">
+                        <td className="px-4 py-3 text-[#6f4358] dark:text-[#b07f97]">
                           {registro.documento ? (
                             <div>
                               {registro.tipo_documento === 'rg' && (
-                                <span className="mb-0.5 block text-[10px] font-bold uppercase text-[#8a2d55]">RG</span>
+                                <span className="mb-0.5 block text-[10px] font-bold uppercase text-[#8a2d55] dark:text-[#d47a9e]">RG</span>
                               )}
                               <span>{registro.tipo_documento === 'rg' ? registro.documento : formatarCpf(registro.documento)}</span>
                             </div>
                           ) : '-'}
                         </td>
-                        <td className="px-4 py-3 text-[#6f4358]">{texto(registro.empresa)}</td>
-                        <td className="px-4 py-3 text-[#6f4358]">{texto(registro.servico)}</td>
-                        <td className="px-4 py-3 text-[#6f4358]">{texto(registro.destino)}</td>
-                        <td className="px-4 py-3 text-[#6f4358]">
+                        <td className="px-4 py-3 text-[#6f4358] dark:text-[#b07f97]">{texto(registro.empresa)}</td>
+                        <td className="px-4 py-3 text-[#6f4358] dark:text-[#b07f97]">{texto(registro.servico)}</td>
+                        <td className="px-4 py-3 text-[#6f4358] dark:text-[#b07f97]">{texto(registro.destino)}</td>
+                        <td className="px-4 py-3 text-[#6f4358] dark:text-[#b07f97]">
                           {registro.entrada_evento ? (
                             <div
                               className="cursor-default space-y-1"
@@ -1704,7 +1706,7 @@ export default function Porteiro() {
                               }}
                               onMouseLeave={() => setTooltip(null)}
                             >
-                              <p className="font-semibold text-[#4a2636]">{texto(registro.evento_nome)}</p>
+                              <p className="font-semibold text-[#4a2636] dark:text-[#c9a0b4]">{texto(registro.evento_nome)}</p>
                               <p className="text-xs leading-5">{resumirTexto(registro.itens_entrada, 20)}</p>
                             </div>
                           ) : (
@@ -1719,7 +1721,7 @@ export default function Porteiro() {
                                 onClick={() =>
                                   window.open(registro.evento_lista_foto_url || '', '_blank', 'noopener,noreferrer')
                                 }
-                                className="rounded-md border border-[#eadde3] bg-[#fffafb] px-3 py-2 text-xs font-bold text-[#97003f]"
+                                className="rounded-md border border-[#eadde3] bg-[#fffafb] px-3 py-2 text-xs font-bold text-[#97003f] dark:border-[#3a1f2a] dark:bg-[#180d11] dark:text-[#f07a9e]"
                               >
                                 PDF
                               </button>
@@ -1732,7 +1734,7 @@ export default function Porteiro() {
                                     src: registro.evento_lista_foto_url || '',
                                   })
                                 }
-                                className="size-12 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb]"
+                                className="size-12 overflow-hidden rounded-md border border-[#eadde3] bg-[#fffafb] dark:border-[#3a1f2a] dark:bg-[#180d11]"
                               >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
@@ -1743,15 +1745,15 @@ export default function Porteiro() {
                               </button>
                             )
                           ) : (
-                            <span className="text-[#6f4358]">-</span>
+                            <span className="text-[#6f4358] dark:text-[#b07f97]">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-[#6f4358]">{formatarData(registro.hora_entrada)}</td>
-                        <td className="px-4 py-3 text-[#6f4358]">
+                        <td className="px-4 py-3 text-[#6f4358] dark:text-[#b07f97]">{formatarData(registro.hora_entrada)}</td>
+                        <td className="px-4 py-3 text-[#6f4358] dark:text-[#b07f97]">
                           {registro.hora_saida ? formatarData(registro.hora_saida) : '-'}
                         </td>
                         <td className="px-4 py-3">
-                          <span className="rounded-full bg-[#fff0f6] px-3 py-1 text-xs font-bold text-[#97003f]">
+                          <span className="rounded-full bg-[#fff0f6] px-3 py-1 text-xs font-bold text-[#97003f] dark:bg-[#2a0f1a] dark:text-[#d47a9e]">
                             {situacao}
                           </span>
                         </td>
@@ -1798,13 +1800,13 @@ export default function Porteiro() {
 
       {confirmacaoEntradaAberta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2b1420]/70 p-4">
-          <div className="w-full max-w-4xl rounded-xl border border-[#eadde3] bg-white p-5 shadow-xl">
-            <h2 className="text-lg font-bold text-[#2b1420]">Confirmar entrada</h2>
-            <p className="mt-2 text-sm text-[#6f4358]">
+          <div className="w-full max-w-4xl rounded-xl border border-[#eadde3] bg-white p-5 shadow-xl dark:border-[#3a1f2a] dark:bg-[#1c1014]">
+            <h2 className="text-lg font-bold text-[#2b1420] dark:text-[#eddde6]">Confirmar entrada</h2>
+            <p className="mt-2 text-sm text-[#6f4358] dark:text-[#b07f97]">
               Confira os dados antes de registrar a entrada do visitante.
             </p>
 
-            <div className="mt-4 rounded-lg bg-[#fffafb] p-4 text-sm text-[#4a2636]">
+            <div className="mt-4 rounded-lg bg-[#fffafb] p-4 text-sm text-[#4a2636] dark:bg-[#180d11] dark:text-[#c9a0b4]">
               <p><strong>Nome:</strong> {form.nome || '-'}</p>
               <p className="mt-2"><strong>Documento ({form.tipoDocumento.toUpperCase()}):</strong> {formatarDocumento(form.documento, form.tipoDocumento) || '-'}</p>
               <p className="mt-2"><strong>Telefone:</strong> {formatarTelefone(form.telefone) || '-'}</p>
@@ -1841,7 +1843,7 @@ export default function Porteiro() {
               <button
                 type="button"
                 onClick={() => setConfirmacaoEntradaAberta(false)}
-                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]"
               >
                 Cancelar
               </button>
@@ -1875,22 +1877,22 @@ export default function Porteiro() {
 
       {cameraAberta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2b1420]/70 p-4">
-          <div className="w-full max-w-3xl rounded-lg border border-[#eadde3] bg-white p-4 shadow-xl sm:p-5">
+          <div className="w-full max-w-3xl rounded-lg border border-[#eadde3] bg-white p-4 shadow-xl sm:p-5 dark:border-[#3a1f2a] dark:bg-[#1c1014]">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p className="text-base font-bold text-[#2b1420]">Camera ativa</p>
-                <p className="text-sm text-[#8a2d55]">Posicione o visitante e capture a foto.</p>
+                <p className="text-base font-bold text-[#2b1420] dark:text-[#eddde6]">Camera ativa</p>
+                <p className="text-sm text-[#8a2d55] dark:text-[#d47a9e]">Posicione o visitante e capture a foto.</p>
               </div>
               <button
                 type="button"
                 onClick={fecharCamera}
-                className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                className="rounded-md border border-[#d7b8c7] bg-white px-3 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]"
               >
                 Fechar
               </button>
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-[#eadde3] bg-black">
+            <div className="overflow-hidden rounded-lg border border-[#eadde3] bg-black dark:border-[#3a1f2a]">
               <video
                 ref={videoRef}
                 autoPlay
@@ -1904,7 +1906,7 @@ export default function Porteiro() {
               <button
                 type="button"
                 onClick={fecharCamera}
-                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6]"
+                className="rounded-md border border-[#d7b8c7] bg-white px-4 py-2 text-sm font-bold text-[#97003f] transition hover:bg-[#fff0f6] dark:border-[#4a2a38] dark:bg-[#1c1014] dark:text-[#f07a9e] dark:hover:bg-[#2a1520]"
               >
                 Cancelar
               </button>
@@ -1932,15 +1934,15 @@ export default function Porteiro() {
           pelo overflow-x-auto da tabela e nao causar scroll ao aparecer */}
       {tooltip && (
         <div
-          className="pointer-events-none fixed z-50 w-[320px] max-w-[42vw] rounded-lg border border-[#e7c8d6] bg-white p-3 text-left shadow-lg"
+          className="pointer-events-none fixed z-50 w-[320px] max-w-[42vw] rounded-lg border border-[#e7c8d6] bg-white p-3 text-left shadow-lg dark:border-[#4a2a38] dark:bg-[#1c1014]"
           style={{ top: tooltip.y, left: Math.min(Math.max(tooltip.x, 8), window.innerWidth - 340) }}
         >
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">Evento</p>
-          <p className="mt-1 text-sm font-semibold text-[#2b1420]">
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55] dark:text-[#d47a9e]">Evento</p>
+          <p className="mt-1 text-sm font-semibold text-[#2b1420] dark:text-[#eddde6]">
             {texto(tooltip.registro.evento_nome)}
           </p>
-          <p className="mt-3 text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55]">Itens</p>
-          <p className="mt-1 whitespace-pre-line text-sm leading-6 text-[#6f4358]">
+          <p className="mt-3 text-xs font-bold uppercase tracking-[0.08em] text-[#8a2d55] dark:text-[#d47a9e]">Itens</p>
+          <p className="mt-1 whitespace-pre-line text-sm leading-6 text-[#6f4358] dark:text-[#b07f97]">
             {texto(tooltip.registro.itens_entrada).replace(/\s\|\s/g, '\n')}
           </p>
         </div>
