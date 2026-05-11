@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { validarAdminPorToken } from '../../../../lib/supabase-admin'
-import { limparBloqueio } from '../../../../lib/login-attempts'
+
 type BodyDesbloquearPorteiro = {
   email?: string
 }
@@ -21,10 +21,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    await validarAdminPorToken(token)
+    const { adminClient } = await validarAdminPorToken(token)
 
-    // Desbloquear porteiro
-    await limparBloqueio(email)
+    // adminClient usa service_role e bypassa RLS — única forma de alterar login_attempts no servidor
+    await adminClient
+      .from('login_attempts')
+      .update({ tentativas_erradas: 0, bloqueado_ate: null, atualizado_em: new Date().toISOString() })
+      .eq('email', email)
 
     return NextResponse.json({ ok: true, mensagem: `Porteiro ${email} desbloqueado com sucesso.` })
   } catch (error) {

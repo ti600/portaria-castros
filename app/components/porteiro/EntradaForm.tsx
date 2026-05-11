@@ -333,22 +333,30 @@ export function EntradaForm({
         )}
 
         {formularioLiberado ? (
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="submit"
-              disabled={salvandoEntrada}
-              className="rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3] dark:disabled:bg-[#5a3347]"
-            >
-              {salvandoEntrada ? 'Registrando...' : 'Registrar entrada'}
-            </button>
-            <button
-              type="button"
-              onClick={onCancelar}
-              className="rounded-md border border-[#d7b8c7] dark:border-[#4a2a38] bg-white dark:bg-[#1c1014] px-4 py-3 font-bold text-[#97003f] dark:text-[#f07a9e] transition hover:bg-[#fff0f6] dark:hover:bg-[#2a1520]"
-            >
-              Cancelar
-            </button>
-          </div>
+          <>
+            <div className="mb-4 rounded-md border border-[#d8e8f0] dark:border-[#1a3a4a] bg-[#f0f8ff] dark:bg-[#0d1e27] px-4 py-3 text-xs text-[#2a5a7a] dark:text-[#7ab8d4]">
+              <strong>Aviso de privacidade (LGPD):</strong> Os dados coletados neste formulario (nome,
+              documento, telefone e foto) sao utilizados exclusivamente para controle de acesso e
+              seguranca do hotel. O tratamento e baseado no legitimo interesse do estabelecimento,
+              conforme a Lei 13.709/2018. Em caso de duvidas, procure a administracao.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="submit"
+                disabled={salvandoEntrada}
+                className="rounded-md bg-[#97003f] px-4 py-3 font-bold text-white transition hover:bg-[#7b0034] disabled:bg-[#c08aa3] dark:disabled:bg-[#5a3347]"
+              >
+                {salvandoEntrada ? 'Registrando...' : 'Registrar entrada'}
+              </button>
+              <button
+                type="button"
+                onClick={onCancelar}
+                className="rounded-md border border-[#d7b8c7] dark:border-[#4a2a38] bg-white dark:bg-[#1c1014] px-4 py-3 font-bold text-[#97003f] dark:text-[#f07a9e] transition hover:bg-[#fff0f6] dark:hover:bg-[#2a1520]"
+              >
+                Cancelar
+              </button>
+            </div>
+          </>
         ) : null}
       </div>
     </form>
