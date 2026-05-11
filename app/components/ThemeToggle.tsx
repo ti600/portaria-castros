@@ -6,7 +6,18 @@ export function ThemeToggle() {
   const [escuro, setEscuro] = useState(false)
 
   useEffect(() => {
-    setEscuro(document.documentElement.classList.contains('dark'))
+    // Re-aplica o tema do localStorage caso tenha navegado via client-side (ex: vindo da tela de login)
+    const classeEscuro = document.documentElement.classList.contains('dark')
+    if (!classeEscuro) {
+      try {
+        if (localStorage.getItem('tema') === 'escuro') {
+          document.documentElement.classList.add('dark')
+          setEscuro(true)
+          return
+        }
+      } catch (_) {}
+    }
+    setEscuro(classeEscuro)
   }, [])
 
   function alternar() {

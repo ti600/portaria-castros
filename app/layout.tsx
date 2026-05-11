@@ -22,7 +22,7 @@ export default function RootLayout({
         {/* Aplica o tema salvo antes da pintura para evitar flash */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('tema');if(t==='escuro')document.documentElement.classList.add('dark');}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('tema');if(t==='escuro'&&window.location.pathname!=='/')document.documentElement.classList.add('dark');}catch(e){}})();`,
           }}
         />
       </head>
